@@ -26,7 +26,7 @@
   h1 { font-size: 2.2rem; line-height: 1.25; margin: 0 0 .3em; }
   .sub { color: var(--muted); font-size: 1.1rem; margin-bottom: 1.5rem; }
   h2 { font-size: 1.45rem; line-height: 1.4; margin: 3rem 0 .8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); scroll-margin-top: 1rem; }
-  h3 { font-size: 1.15rem; margin: 2rem 0 .5rem; color: var(--accent); }
+  h3 { font-size: 1.15rem; margin: 2rem 0 .5rem; color: var(--accent); scroll-margin-top: 1rem; }
   p { margin: .8rem 0; }
   blockquote {
     margin: 1.2rem 0; padding: .7rem 1.2rem; background: var(--card);
@@ -50,15 +50,74 @@
   details.toc a { color: var(--accent); text-decoration: none; }
   details.toc a:hover { text-decoration: underline; }
   @media (max-width: 600px) { details.toc ol { columns: 1; } }
+  .toolbar { display: flex; gap: .6rem; margin-bottom: 1rem; }
+  .toolbar button {
+    font: inherit; font-size: .85rem; padding: .3rem .8rem; cursor: pointer;
+    background: var(--card); color: var(--fg); border: 1px solid var(--line); border-radius: 6px;
+  }
+  .toolbar button:hover { border-color: var(--accent); color: var(--accent); }
+  details.sec { border-top: 1px solid var(--line); margin-top: 1.2rem; }
+  details.sec > summary {
+    list-style: none; cursor: pointer; padding: 1.2rem 0 .4rem;
+  }
+  details.sec > summary::-webkit-details-marker { display: none; }
+  details.sec > summary h2 {
+    display: inline; margin: 0; padding: 0; border: 0;
+    font-size: 1.45rem; line-height: 1.4; scroll-margin-top: 1rem;
+  }
+  details.sec .pm::before { content: "+"; color: var(--accent); font-weight: 600; margin-right: .45em; }
+  details.sec[open] .pm::before { content: "–"; }
+  details.sec > summary:hover h2 { color: var(--accent); }
+  .secnav { display: flex; justify-content: space-between; margin-top: 2rem; font-size: .9rem; }
+  .secnav a { color: var(--accent); text-decoration: none; }
+  .secnav a:hover { text-decoration: underline; }
+  nav.rail { display: none; }
+  aside.rail2 { display: none; }
+  @media (min-width: 1280px) {
+    .wrap { grid-template-columns: 200px minmax(0, 820px) 180px; gap: 2rem; max-width: 1364px; }
+    aside.rail2 {
+      display: block; position: sticky; top: 0; align-self: start;
+      max-height: 100vh; overflow-y: auto; padding: 48px 8px 48px 0;
+      font-size: .82rem; line-height: 1.5;
+    }
+    aside.rail2 .rail-title { font-weight: 600; display: block; margin-bottom: .3rem; }
+    aside.rail2 ul { list-style: none; padding: 0; margin: 0; }
+    aside.rail2 li { margin: .15rem 0; }
+    aside.rail2 a { color: var(--muted); text-decoration: none; }
+    aside.rail2 a:hover { color: var(--fg); }
+    aside.rail2 .rail2-back { margin-top: 1.5rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+  }
+  @media (min-width: 1080px) {
+    .wrap {
+      display: grid; grid-template-columns: 220px minmax(0, 820px);
+      gap: 2rem; max-width: 1120px; margin: 0 auto;
+    }
+    nav.rail {
+      display: block; position: sticky; top: 0; align-self: start;
+      max-height: 100vh; overflow-y: auto; padding: 48px 0 48px 8px;
+      font-size: .85rem; line-height: 1.5;
+    }
+    nav.rail .rail-title { font-weight: 600; }
+    nav.rail ol { padding-left: 1.2rem; margin: .5rem 0 0; }
+    nav.rail li { margin: .15rem 0; }
+    nav.rail a { color: var(--muted); text-decoration: none; }
+    nav.rail a:hover { color: var(--fg); }
+    nav.rail a.on { color: var(--accent); font-weight: 600; }
+    main { margin: 0; }
+    details.toc { display: none; }
+  }
   footer { margin-top: 4rem; color: var(--muted); font-size: .9rem; }
 </style>
 </head>
 <body>
+<div class="wrap">
+<nav class="rail" id="rail"><span class="rail-title">目錄</span><ol></ol></nav>
 <main>
 <h1>AI Software Factory 2.0</h1>
 <p class="sub">從 Agentic Coding 到 Verifiable Software Engineering</p>
 
-<details class="toc" id="toc" hidden><summary>目錄（30 節）</summary><ol></ol></details>
+<div class="toolbar"><button id="expand-all" type="button">全部展開</button><button id="collapse-all" type="button">全部收合</button></div>
+<details class="toc" id="toc" hidden><summary>目錄</summary><ol></ol></details>
 
 <h2 id="s1">一、核心結論</h2>
 <p>AI 正在把「寫程式」快速商品化。</p>
@@ -958,20 +1017,137 @@ Evidence System</pre>
 
 <footer>AI Software Factory 2.0</footer>
 </main>
+<aside class="rail2" id="rail2"><span class="rail-title"></span><ul></ul><p class="rail2-back"><a href="#">↑ 回到頂部</a></p></aside>
+</div>
 <script>
-  // 依各節標題產生目錄；無 JS 時目錄保持隱藏
+  // 把每個 h2 章節包成可收合的 <details>，並產生目錄與側邊導航；無 JS 時維持原本全文展開
   (function () {
+    var main = document.querySelector('main');
     var toc = document.getElementById('toc');
-    var list = toc.querySelector('ol');
-    document.querySelectorAll('main h2[id]').forEach(function (h) {
-      var li = document.createElement('li');
-      var a = document.createElement('a');
-      a.href = '#' + h.id;
-      a.textContent = h.textContent.replace(/^[一二三四五六七八九十]+、/, '');
-      li.appendChild(a);
-      list.appendChild(li);
+    var rail = document.getElementById('rail');
+    var KEY = 'asf-open-sections';
+    var saved;
+    try { saved = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { saved = null; }
+
+    var h2s = Array.prototype.slice.call(main.querySelectorAll('h2[id]'));
+
+    // 各節包成 <details>，id 移到 details 上，節尾加「上一節／下一節」
+    h2s.forEach(function (h, i) {
+      var det = document.createElement('details');
+      det.className = 'sec';
+      det.id = h.id;
+      h.removeAttribute('id');
+      h.parentNode.insertBefore(det, h);
+      var sum = document.createElement('summary');
+      var pm = document.createElement('span');
+      pm.className = 'pm';
+      sum.appendChild(pm);
+      sum.appendChild(h);
+      det.appendChild(sum);
+      while (det.nextSibling && !(det.nextSibling.nodeType === 1 && det.nextSibling.tagName === 'H2')) {
+        det.appendChild(det.nextSibling);
+      }
+      det.open = saved ? saved.indexOf(det.id) !== -1 : i === 0;
+
+      // 節內 h3 補上錨點 id，供右欄小節導覽使用
+      det.querySelectorAll('h3').forEach(function (h3, j) {
+        h3.id = det.id + '-' + (j + 1);
+      });
+
+      var nav = document.createElement('div');
+      nav.className = 'secnav';
+      var prev = document.createElement('a');
+      var next = document.createElement('a');
+      if (i > 0) { prev.href = '#s' + i; prev.textContent = '← 上一節'; }
+      if (i < h2s.length - 1) { next.href = '#s' + (i + 2); next.textContent = '下一節 →'; }
+      nav.appendChild(prev);
+      nav.appendChild(next);
+      det.appendChild(nav);
     });
+
+    // 產生頂部目錄（窄螢幕）與側邊目錄（寬螢幕）
+    var secs = Array.prototype.slice.call(main.querySelectorAll('details.sec'));
+    secs.forEach(function (sec) {
+      var title = sec.querySelector('h2').textContent.replace(/^[一二三四五六七八九十]+、/, '');
+      [toc.querySelector('ol'), rail.querySelector('ol')].forEach(function (list) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = '#' + sec.id;
+        a.textContent = title;
+        a.dataset.sec = sec.id;
+        li.appendChild(a);
+        list.appendChild(li);
+      });
+    });
+    toc.querySelector('summary').textContent = '目錄（' + secs.length + ' 節）';
     toc.hidden = false;
+
+    // 記住目前展開的章節
+    function save() {
+      var open = secs.filter(function (d) { return d.open; }).map(function (d) { return d.id; });
+      try { localStorage.setItem(KEY, JSON.stringify(open)); } catch (e) {}
+    }
+    main.addEventListener('toggle', save, true);
+
+    // 右欄：顯示目前章節的 h3 小節導覽
+    var rail2 = document.getElementById('rail2');
+    function renderRight(sec) {
+      rail2.querySelector('.rail-title').textContent = sec.querySelector('h2').textContent;
+      var ul = rail2.querySelector('ul');
+      ul.innerHTML = '';
+      sec.querySelectorAll('h3').forEach(function (h3) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.href = '#' + h3.id;
+        a.textContent = h3.textContent;
+        li.appendChild(a);
+        ul.appendChild(li);
+      });
+    }
+    renderRight(secs[0]);
+
+    // 站內連結：若目標在收合的章節內，先展開再捲動
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest('a[href^="#"]');
+      if (!a) return;
+      var el = document.getElementById(a.getAttribute('href').slice(1));
+      if (!el) return;
+      var det = el.tagName === 'DETAILS' ? el : el.closest('details.sec');
+      if (!det) return;
+      e.preventDefault();
+      det.open = true;
+      save();
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+
+    // 全部展開 / 收合
+    document.getElementById('expand-all').addEventListener('click', function () {
+      secs.forEach(function (d) { d.open = true; });
+      save();
+    });
+    document.getElementById('collapse-all').addEventListener('click', function () {
+      secs.forEach(function (d) { d.open = false; });
+      save();
+    });
+
+    // 側邊目錄標示目前閱讀中的章節
+    var links = Array.prototype.slice.call(rail.querySelectorAll('a'));
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        links.forEach(function (a) {
+          a.classList.toggle('on', a.dataset.sec === en.target.id);
+        });
+      });
+      entries.forEach(function (en) {
+        if (!en.isIntersecting) return;
+        links.forEach(function (a) {
+          a.classList.toggle('on', a.dataset.sec === en.target.id);
+        });
+        renderRight(en.target);
+      });
+    }, { rootMargin: '-10% 0px -75% 0px' });
+    secs.forEach(function (d) { io.observe(d); });
   })();
 </script>
 </body>
