@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AI Software Factory 2.0</title>
-<meta name="description" content="從 Agentic Coding 到分級驗證的軟體工程">
+<meta name="description" content="從 Agentic Coding 到 Verifiable Software Engineering">
 <style>
   :root {
     --bg: #fafaf7; --fg: #1f2328; --muted: #5b636b; --line: #dcdcd4;
@@ -17,130 +17,962 @@
     }
   }
   * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
   body {
     margin: 0; background: var(--bg); color: var(--fg);
     font: 17px/1.8 -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   }
   main { max-width: 820px; margin: 0 auto; padding: 48px 16px 96px; }
   h1 { font-size: 2.2rem; line-height: 1.25; margin: 0 0 .3em; }
-  .sub { color: var(--muted); font-size: 1.1rem; margin-bottom: 2.5rem; }
-  h2 { font-size: 1.45rem; margin: 3rem 0 .8rem; padding-top: 1rem; border-top: 1px solid var(--line); }
-  h2 .n { color: var(--accent); margin-right: .4em; }
+  .sub { color: var(--muted); font-size: 1.1rem; margin-bottom: 1.5rem; }
+  h2 { font-size: 1.45rem; line-height: 1.4; margin: 3rem 0 .8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); scroll-margin-top: 1rem; }
+  h3 { font-size: 1.15rem; margin: 2rem 0 .5rem; color: var(--accent); }
+  p { margin: .8rem 0; }
   blockquote {
-    margin: 1.2rem 0; padding: .8rem 1.2rem; background: var(--card);
-    border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; font-size: 1.1rem;
+    margin: 1.2rem 0; padding: .7rem 1.2rem; background: var(--card);
+    border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; font-size: 1.08rem;
   }
+  blockquote p { margin: .3rem 0; }
   pre {
-    background: var(--code); padding: 1rem 1.2rem; border-radius: 8px;
-    overflow-x: auto; font: 14px/1.6 ui-monospace, Menlo, monospace;
+    background: var(--code); padding: 1rem 1.2rem; border-radius: 8px; margin: 1rem 0;
+    overflow-x: auto; font: 13.5px/1.55 ui-monospace, Menlo, "SF Mono", "Noto Sans Mono CJK TC", monospace;
   }
+  code { font-family: ui-monospace, Menlo, monospace; background: var(--code); padding: .1em .35em; border-radius: 4px; font-size: .92em; }
   .table-wrap { overflow-x: auto; margin: 1rem 0; }
   table { border-collapse: collapse; width: 100%; font-size: .95rem; background: var(--card); }
   th, td { border: 1px solid var(--line); padding: .55rem .8rem; text-align: left; vertical-align: top; }
   th { background: var(--code); }
   ul, ol { padding-left: 1.4rem; }
-  li { margin: .3rem 0; }
-  .final { font-size: 1.15rem; }
+  li { margin: .25rem 0; }
+  details.toc { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: .6rem 1rem; margin-bottom: 1rem; }
+  details.toc summary { cursor: pointer; font-weight: 600; }
+  details.toc ol { columns: 2; column-gap: 2rem; font-size: .95rem; margin: .6rem 0 0; }
+  details.toc a { color: var(--accent); text-decoration: none; }
+  details.toc a:hover { text-decoration: underline; }
+  @media (max-width: 600px) { details.toc ol { columns: 1; } }
   footer { margin-top: 4rem; color: var(--muted); font-size: .9rem; }
 </style>
 </head>
 <body>
 <main>
 <h1>AI Software Factory 2.0</h1>
-<p class="sub">從 Agentic Coding 到分級驗證的軟體工程</p>
+<p class="sub">從 Agentic Coding 到 Verifiable Software Engineering</p>
 
-<h2><span class="n">一</span>核心結論</h2>
-<p>AI 正在讓「產生 code」的成本趨近於零。Software Factory 的瓶頸因此從「誰寫得快」轉為：</p>
-<blockquote>我們憑什麼相信 AI 產生的東西是對的？而且信到什麼程度？</blockquote>
-<p>下一階段的重點不是增加更多 Agent，而是建立<strong>分級驗證</strong>。每個產出物都要有與其風險相稱的證據：</p>
-<pre>Specification → Generation → Verification → Evidence → Release</pre>
-<p>這個主張有兩個前提。第一，驗證強度是一條光譜，不是「有證明 / 沒證明」的二選一。第二，驗證只能保證「產出符合規格」，<strong>規格本身是否正確，仍然需要人來把關</strong>。</p>
-<p>Martin Kleppmann 在 2025 年的判斷是：Formal Verification 過去沒有普及，主因是人工撰寫 proof 的成本太高。如果 LLM 能大量產生 proof，再由 deterministic proof checker 判定，其經濟結構<em>有可能</em>改變。這是條件式的預測，目前仍需要實證。</p>
+<details class="toc" id="toc" hidden><summary>目錄（30 節）</summary><ol></ol></details>
 
-<h2><span class="n">二</span>四個階段（並存，而非取代）</h2>
-<div class="table-wrap"><table>
-<tr><th>階段</th><th>特徵</th><th>主要限制</th></tr>
-<tr><td>1. 傳統工程</td><td>人設計、人寫、人審</td><td>產能 ≈ 工程師數量 × 速度</td></tr>
-<tr><td>2. AI Coding</td><td>Prompt → AI 產碼 → 人審</td><td>產碼速度超過審查與測試速度</td></tr>
-<tr><td>3. Agentic Factory</td><td>多 Agent 分工，有 sandbox、quality gate、audit evidence、approval gate</td><td>驗證者與生成者同為機率模型</td></tr>
-<tr><td>4. Verifiable Engineering</td><td>關鍵產出物由確定性機制判定</td><td>規格正確性、適用範圍、驗證成本</td></tr>
-</table></div>
-<p>實務上這四個階段會同時存在。多數系統停在 Stage 3，只有高風險模組才導入 Stage 4。</p>
+<h2 id="s1">一、核心結論</h2>
+<p>AI 正在把「寫程式」快速商品化。</p>
+<p>當 AI 可以大量產生 code、test、文件、migration、API、UI，Software Factory 真正的瓶頸就不再是：</p>
+<blockquote>誰能寫得更快？</blockquote>
+<p>而會變成：</p>
+<blockquote><strong>我們如何知道 AI 產生的東西真的正確？</strong></blockquote>
+<p>因此 AI Software Factory 的下一階段，不應只是增加更多 Agent，而是把軟體工程逐步轉成：</p>
+<p><strong>Specification → Generation → Verification → Evidence → Release</strong></p>
+<p>也就是從：</p>
+<p><strong>Agentic Software Engineering</strong></p>
+<p>進一步走向：</p>
+<p><strong>Verifiable Software Engineering</strong></p>
+<p>Martin Kleppmann 在 2025 年提出的核心判斷正是如此：Formal Verification 過去無法普及，主要不是因為它沒有價值，而是因為建立 formal proof 的人工成本太高；如果 LLM 能大量自動產生 proof，而 deterministic proof checker 負責判斷證明是否成立，Formal Verification 的經濟結構就可能徹底改變。</p>
 
-<h2><span class="n">三</span>Multi-Agent 為何不能保證正確性</h2>
-<p>假設 Agent A 寫程式，B 審查，C 寫測試，D 做安全審查。四者都是機率模型，會有<strong>相關性失敗</strong>：共享訓練偏誤，可能一起接受同一個錯誤假設。</p>
-<p>這能顯著提高品質，但沒有取得正確性保證。同樣的問題也出現在 AI 自己寫的測試：測試執行是確定性的，但測試案例只覆蓋 AI 想到的情境，這不等於正確性證明。</p>
-
-<h2><span class="n">四</span>驗證強度光譜</h2>
-<p>「Deterministic」不是單一概念。各層保證的強度與成本差異很大：</p>
-<div class="table-wrap"><table>
-<tr><th>層級</th><th>機制</th><th>保證的內容</th><th>典型適用</th></tr>
-<tr><td>L0</td><td>Lint、格式檢查</td><td>風格一致</td><td>全部程式碼</td></tr>
-<tr><td>L1</td><td>型別系統、靜態分析</td><td>排除一整類錯誤</td><td>全部程式碼</td></tr>
-<tr><td>L2</td><td>範例測試、整合測試</td><td>已列舉情境成立</td><td>全部功能</td></tr>
-<tr><td>L3</td><td>屬性測試、突變測試、契約測試</td><td>較廣的輸入空間與測試品質</td><td>核心業務邏輯、API 邊界</td></tr>
-<tr><td>L4</td><td>模型檢查</td><td>有限狀態空間內窮舉</td><td>狀態機、協定、併發</td></tr>
-<tr><td>L5</td><td>定理證明（Formal Proof）</td><td>對規格的數學保證</td><td>密碼學、金流核心、安全關鍵</td></tr>
-</table></div>
-<p>原則是依風險選層級，不要一律追求 L5。L0 到 L2 的 AI 產出物已經可以大量自動化。越往上，成本越高，適用範圍越窄。</p>
-
-<h2><span class="n">五</span>規格才是新的瓶頸</h2>
-<p>Proof checker 只能回答「程式是否符合規格」，無法回答「規格是否符合使用者真正要的東西」。</p>
+<h2 id="s2">二、Software Factory 正在經歷四個階段</h2>
+<h3>Stage 1 — 傳統 Software Engineering</h3>
+<pre>Requirement
+   ↓
+Human Design
+   ↓
+Human Coding
+   ↓
+Code Review
+   ↓
+Testing
+   ↓
+Release</pre>
+<p>核心限制是：</p>
+<pre>產能 ≈ 工程師數量 × 工程師速度</pre>
+<p>因此大型組織需要：</p>
 <ul>
-<li>形式規格本身需要人撰寫，也可能寫錯。</li>
-<li>若讓 LLM 同時產生規格與證明，checker 只保證兩者互相一致。相關性失敗只是從程式層搬到規格層。</li>
-<li>多數業務系統（CRUD、報表、UI、第三方整合、權限規則）沒有現成的形式規格可寫。</li>
+<li>Developer</li><li>QA</li><li>Architect</li><li>Security</li><li>DevOps</li><li>Reviewer</li><li>Product Manager</li>
 </ul>
-<p>因此流程中必須有一道<strong>人類主導的 Specification Review</strong>。它是獨立關卡，不能被 AI 的自我審查取代。</p>
+<p>靠人與人的 handoff 建構品質。</p>
 
-<h2><span class="n">六</span>確定性驗證層架構</h2>
-<pre>Human: 寫作 / 審閱 Specification  ← 人類把關點
+<h2 id="s3">三、Stage 2 — AI Coding</h2>
+<p>Copilot、Claude Code、Codex 等工具出現後：</p>
+<pre>Requirement
+   ↓
+Prompt
+   ↓
+AI
+   ↓
+Code
+   ↓
+Human Review
+   ↓
+Testing</pre>
+<p>最大的改變是：</p>
+<pre>Code Generation Cost ↓↓↓</pre>
+<p>一名工程師可以產生過去數倍甚至數十倍的程式碼。</p>
+<p>但是新的瓶頸隨之出現：</p>
+<pre>Code Generation ↑↑↑
+
+Review Capacity
+Testing Capacity
+Architecture Capacity
+Understanding Capacity
+
+沒有同步增加</pre>
+<p>於是開始出現一個非常重要的問題：</p>
+<blockquote><strong>產碼速度超過驗證速度。</strong></blockquote>
+
+<h2 id="s4">四、Stage 3 — Agentic Software Factory</h2>
+<p>接下來自然會開始分工。</p>
+<p>不是一個 Agent 做全部，而是：</p>
+<pre>Product Agent
+     ↓
+Planning Agent
+     ↓
+Architecture Agent
+     ↓
+Coding Agent
+     ↓
+Testing Agent
+     ↓
+Security Agent
+     ↓
+Review Agent
+     ↓
+Release Agent</pre>
+<p>目前已經有不少 Software Factory 類型的系統採用這種思路，例如建立：</p>
+<ul>
+<li>supervised agent runs</li><li>Git discipline</li><li>automatic quality gates</li><li>sandbox</li><li>audit evidence</li><li>approval gates</li>
+</ul>
+<p>把 AI Coding 從單次對話轉換成可重複的 production pipeline。</p>
+<p>這一代可以稱為：</p>
+<blockquote><strong>Agentic Software Factory</strong></blockquote>
+
+<h2 id="s5">五、但 Multi-Agent 並沒有真正解決 correctness</h2>
+<p>這是最容易被忽略的一點。</p>
+<p>假設：</p>
+<pre>Agent A 寫程式
+Agent B Review
+Agent C 寫測試
+Agent D Security Review</pre>
+<p>看起來比一個 Agent 好很多。</p>
+<p>但是本質上：</p>
+<pre>A = probabilistic model
+B = probabilistic model
+C = probabilistic model
+D = probabilistic model</pre>
+<p>所以它形成的是：</p>
+<pre>Probabilistic Generator
         ↓
-AI: 生成 Artifact（code / test / proof）
+Probabilistic Reviewer
         ↓
+Probabilistic Tester</pre>
+<p>它可以顯著提高品質。</p>
+<p>但仍然沒有得到：</p>
+<pre>Correctness Guarantee</pre>
+<p>Agent 甚至可能共同接受同一個錯誤假設。</p>
+
+<h2 id="s6">六、真正需要的是 Deterministic Verification Layer</h2>
+<p>AI Software Factory 最重要的架構變化可能是：</p>
+<pre>          AI
+           ↓
+     Generate Artifact
+           ↓
+┌──────────────────────┐
+│ Deterministic Checker │
+└──────────────────────┘
+           ↓
+      Pass / Fail</pre>
+<p>也就是：</p>
+<blockquote>AI 負責搜尋解法。</blockquote>
+<p>而：</p>
+<blockquote>Machine 負責判定解法是否成立。</blockquote>
+<p>這兩件事情必須分開。</p>
+
+<h2 id="s7">七、這就是 Formal Verification 開始重要的原因</h2>
+<p>Formal Verification 的基本形式是：</p>
+<pre>Specification
+      +
+Implementation
+      +
+Proof
+      ↓
+Proof Checker
+      ↓
+Valid / Invalid</pre>
+<p>例如要求一個函式：</p>
+<pre>withdraw(balance, amount)</pre>
+<p>必須滿足：</p>
+<pre>amount &lt;= balance
+
+且
+
+new_balance = balance - amount
+
+且
+
+new_balance &gt;= 0</pre>
+<p>AI 可以產生：</p>
+<pre>Implementation
++
+Proof</pre>
+<p>但是 AI 沒有最終決定權。</p>
+<p>最後由：</p>
+<pre>Lean
+Isabelle
+Coq / Rocq
+Dafny
+F*
+Verus
+SPARK
+SMT Solver
+Model Checker</pre>
+<p>進行判定。</p>
+<p>Kleppmann 特別指出，proof generation 是 LLM 很適合的一種工作，因為 AI 即使 hallucinate，錯誤 proof 也無法欺騙正常運作的 proof checker；失敗後 Agent 可以重新搜尋新的證明。</p>
+
+<h2 id="s8">八、Vericoding</h2>
+<p>這因此形成一個和 Vibe Coding 很有趣的對比：</p>
+<pre>Vibe Coding
+
+Prompt
+ ↓
+AI
+ ↓
+看起來能跑
+ ↓
+Ship</pre>
+<p>變成：</p>
+<pre>Vericoding
+
+Specification
+ ↓
+AI
+ ↓
+Implementation
+ +
+Proof
+ ↓
+Verifier
+ ↓
+Verified Artifact</pre>
+<p>關鍵不在於：</p>
+<blockquote>AI 比以前更可靠。</blockquote>
+<p>而在於：</p>
+<blockquote><strong>我們不需要相信 AI。</strong></blockquote>
+
+<h2 id="s9">九、Software Factory 2.0 的完整架構</h2>
+<p>比較完整的 Factory 應該變成：</p>
+<pre>                    Human Intent
+                         ↓
+                 Requirement Layer
+                         ↓
+              Specification Synthesis
+                         ↓
+              Architecture / Contracts
+                         ↓
+        ┌────────────────────────────┐
+        │                            │
+        ↓                            ↓
+Implementation Agent         Verification Agent
+        │                            │
+        ↓                            ↓
+      Code                  Proof / Properties
+        │                            │
+        └─────────────┬──────────────┘
+                      ↓
+              Deterministic Gates
+                      ↓
+        ┌─────────────────────────┐
+        │ Type Checker            │
+        │ Static Analysis         │
+        │ Unit Tests              │
+        │ Integration Tests       │
+        │ Property Tests          │
+        │ Fuzzing                 │
+        │ Model Checking          │
+        │ Formal Proof            │
+        │ Security Analysis       │
+        └─────────────────────────┘
+                      ↓
+             Runtime Acceptance
+                      ↓
+            Production Evidence
+                      ↓
+                  Release</pre>
+
+<h2 id="s10">十、最重要的不是 Code，而是 Contract</h2>
+<p>未來 Software Factory 的 authority hierarchy 很可能是：</p>
+<pre>Human Intent
+    ↓
+Specification
+    ↓
+Contract
+    ↓
+Proof Obligation
+    ↓
+Implementation</pre>
+<p>而不是：</p>
+<pre>Code = Truth</pre>
+<p>換句話說：</p>
+<blockquote><strong>Code 會逐漸變成 Spec 的 compiled artifact。</strong></blockquote>
+<p>就像今天工程師通常不需要閱讀 compiler 產生的 machine code。</p>
+<p>未來某些 AI-generated code 也可能不再需要人類逐行閱讀。</p>
+<p>真正需要 review 的會變成：</p>
+<pre>Requirement
+Specification
+Invariant
+Architecture Constraint
+Security Property</pre>
+<p>Kleppmann 甚至直接提出類似的想像：如果 AI 能產生 implementation 與 correctness proof，人類可能不再需要把 AI-generated source code 本身當成主要 review 對象。</p>
+
+<h2 id="s11">十一、真正的新瓶頸：Specification</h2>
+<p>但 Formal Verification 並不代表：</p>
+<pre>Verified = 正確產品</pre>
+<p>它真正代表的是：</p>
+<pre>Implementation
+符合
+Specification</pre>
+<p>因此：</p>
+<pre>錯誤 Specification
++
+完美 Implementation
++
+完美 Proof
+=
+完美證明一個錯誤需求</pre>
+<p>所以 Software Engineering 的難題會往上移。</p>
+<p>以前的問題是：</p>
+<pre>你程式有沒有寫錯？</pre>
+<p>未來會逐漸變成：</p>
+<pre>你 Spec 有沒有寫錯？</pre>
+<p>這也是目前 formal-AI 研究非常重要的方向。</p>
+<p>例如 2026 年的 Verus-SpecGym 就專門研究：</p>
+<blockquote>AI 是否能把 informal requirement 正確轉換成 formal specification。</blockquote>
+<p>研究本身直接指出：即使 implementation 有 machine-checked proof，也無法保證 formal spec 本身符合原始使用者意圖。</p>
+
+<h2 id="s12">十二、因此必須建立 Spec Validation Layer</h2>
+<p>未來 Factory 不能只有：</p>
+<pre>Code Verification</pre>
+<p>還要有：</p>
+<pre>Intent
+ ↓
+Natural Language Requirement
+ ↓
+Formal Specification
+ ↓
+Spec Validation</pre>
+<p>可以使用：</p>
+<pre>Human Review
+AI Critic
+Counterexample Generation
+Simulation
+Example / Anti-example
+Property Testing
+Domain Constraints</pre>
+<p>例如：</p>
+<p>使用者說：</p>
+<pre>訂單付款後不得修改</pre>
+<p>Formalization Agent 可能寫成：</p>
+<pre>status == PAID
+→ immutable(order)</pre>
+<p>但真正需求其實可能是：</p>
+<pre>Paid order
+
+可以修改：
+delivery_note
+shipping_address
+
+不能修改：
+item
+price
+quantity
+customer</pre>
+<p>Formal proof 沒有辦法替你決定：</p>
+<blockquote>哪一個需求才是對的。</blockquote>
+<p>所以 Human 的角色並不會消失。</p>
+<p>只是會從：</p>
+<pre>Code Producer</pre>
+<p>轉變成：</p>
+<pre>Intent / Constraint Designer</pre>
+
+<h2 id="s13">十三、Testing 不會消失</h2>
+<p>Formal Verification 也不會完全取代 Testing。</p>
+<p>因為不同驗證工具處理不同問題。</p>
+<p>比較合理的是：</p>
+<div class="table-wrap"><table>
+<tr><th>Layer</th><th>解決問題</th></tr>
+<tr><td>Type System</td><td>類型錯誤</td></tr>
+<tr><td>Static Analysis</td><td>Known bad patterns</td></tr>
+<tr><td>Unit Test</td><td>Example correctness</td></tr>
+<tr><td>Property Test</td><td>大量輸入空間</td></tr>
+<tr><td>Fuzzing</td><td>Unexpected input</td></tr>
+<tr><td>Integration Test</td><td>component interaction</td></tr>
+<tr><td>E2E</td><td>真實流程</td></tr>
+<tr><td>Browser Acceptance</td><td>真實 UI / runtime</td></tr>
+<tr><td>Model Checking</td><td>state-space properties</td></tr>
+<tr><td>Formal Proof</td><td>mathematical correctness</td></tr>
+<tr><td>Production Monitoring</td><td>real-world behavior</td></tr>
+</table></div>
+<p>因此 Factory 不應該只有一個「測試」階段。</p>
+<p>而應該是：</p>
+<pre>Verification Stack</pre>
+
+<h2 id="s14">十四、Formal Verification 不應該全面套用</h2>
+<p>最大的實務誤區會是：</p>
+<pre>所有程式都 formal verify</pre>
+<p>這不合理。</p>
+<p>例如：</p>
+<pre>padding 是 12px 還是 14px
+動畫看起來順不順
+UI 好不好看
+按鈕位置舒不舒服</pre>
+<p>Formal Verification 幾乎沒有價值。</p>
+<p>真正適合的是：</p>
+<pre>高風險
++
+高價值
++
+高度規則化
++
+可描述 invariant</pre>
+
+<h2 id="s15">十五、ERP 是非常適合的領域</h2>
+<p>ERP 裡存在大量 invariant。</p>
+<p>例如庫存：</p>
+<pre>Ending Inventory
+=
+Beginning Inventory
++ Incoming
+- Outgoing</pre>
+<p>會計：</p>
+<pre>Σ Debit = Σ Credit</pre>
+<p>付款：</p>
+<pre>Paid Amount
+&lt;=
+Invoice Amount</pre>
+<p>權限：</p>
+<pre>User without permission X
+
+永遠不得執行：
+
+Operation X</pre>
+<p>Workflow：</p>
+<pre>Draft
+ ↓
+Submitted
+ ↓
+Approved
+ ↓
+Completed</pre>
+<p>不允許：</p>
+<pre>Completed
+ ↓
+Draft</pre>
+<p>除非：</p>
+<pre>合法 reversal operation</pre>
+<p>這些都非常適合：</p>
+<pre>Invariant
+State Machine
+Formal Contract
+Property Test
+Model Checking</pre>
+
+<h2 id="s16">十六、遊戲其實也適合部分 Formal Verification</h2>
+<p>遊戲不用全部 Formalize。</p>
+<p>但 gameplay runtime 有大量狀態機，例如：</p>
+<pre>World
+ ↓
+Encounter
+ ↓
+Battle
+ ↓
+Victory
+ ↓
+World</pre>
+<p>可以定義：</p>
+<pre>BattleExit
+→
+WorldState 恢復</pre>
+<p>以及：</p>
+<pre>Modal Active
+→
+World Input Disabled</pre>
+<p>或：</p>
+<pre>Cutscene Active
+→
+Player Movement Disabled</pre>
+<p>甚至：</p>
+<pre>Battle Finished
+→
+不存在仍 active 的 battle-owned timer</pre>
+<p>這些都可以從普通 regression test：</p>
+<pre>我測過一次是對的</pre>
+<p>逐步提升成：</p>
+<pre>所有合法 transition
+都必須滿足 invariant</pre>
+
+<h2 id="s17">十七、你目前的開發流程其實已經接近 Factory 雛形</h2>
+<p>目前這類專案逐漸形成：</p>
+<pre>Reverse Evidence
+       ↓
+Authority
+       ↓
+Contract
+       ↓
+Implementation
+       ↓
+Targeted Regression
+       ↓
+Type Check
+       ↓
+Build
+       ↓
+Real Browser Acceptance
+       ↓
+Evidence
+       ↓
+Closure</pre>
+<p>這已經不是單純：</p>
+<pre>AI 幫忙寫 Code</pre>
+<p>而是：</p>
+<pre>AI 在 Verification Pipeline 裡工作</pre>
+<p>真正下一步只需要把其中部分 Contract：</p>
+<pre>Informal Contract</pre>
+<p>提升成：</p>
+<pre>Executable Contract</pre>
+<p>再把最高價值部分提升成：</p>
+<pre>Formal Contract</pre>
+<p>這會是一條比「整個系統全面 Lean 化」務實得多的路。</p>
+
+<h2 id="s18">十八、Verification Pyramid</h2>
+<p>Factory 可以建立四層品質等級。</p>
+<h3>Level 1 — Generative</h3>
+<pre>AI writes code</pre>
+<p>最低成本。</p>
+<h3>Level 2 — Tested</h3>
+<pre>AI writes code
++
+Tests
++
+CI</pre>
+<p>目前大部分 AI coding 停留在這。</p>
+<h3>Level 3 — Contract Verified</h3>
+<pre>AI writes code
++
+Executable Contracts
++
+Property Tests
++
+State Machine Validation
++
+Static Analysis</pre>
+<p>這可能是未來企業 Software Factory 的主力。</p>
+<h3>Level 4 — Formally Verified</h3>
+<pre>Formal Specification
++
+Implementation
++
+Machine Checked Proof</pre>
+<p>只套用在高價值核心。</p>
+
+<h2 id="s19">十九、最合理的 Factory 比例</h2>
+<p>不是：</p>
+<pre>100% Formal Verification</pre>
+<p>比較可能是：</p>
+<pre>60–80%
+Tests / CI / Static Analysis
+
+15–30%
+Executable Contract / Property Verification
+
+1–10%
+Formal Verification</pre>
+<p>真正核心的：</p>
+<pre>Money
+Permission
+Security
+State Machine
+Distributed Protocol
+Inventory
+Accounting
+Settlement
+Migration
+Critical Algorithm</pre>
+<p>才進 Level 4。</p>
+
+<h2 id="s20">二十、Factory 的核心應該是 Quality Gate，而不是 Agent</h2>
+<p>這一點很重要。</p>
+<p>很多 AI Software Factory 會把 architecture 畫成：</p>
+<pre>Agent
+Agent
+Agent
+Agent
+Agent</pre>
+<p>但真正的中心應該是：</p>
+<pre>                Quality Gate
+                     ↑
+                     │
+Agent → Artifact → Verification
+                     │
+                     ↓
+               Evidence Store</pre>
+<p>Agent 是可替換的。</p>
+<p>今天可以：</p>
+<pre>GPT
+Claude
+Gemini
+Codex
+local model</pre>
+<p>明天也可以換。</p>
+<p>真正企業資產是：</p>
+<pre>Specification
+Contracts
+Tests
+Invariants
+Verification Rules
+Evidence</pre>
+
+<h2 id="s21">二十一、Evidence 才是 Software Factory 的產品之一</h2>
+<p>未來每一次 Factory Run 不應只產生：</p>
+<pre>commit</pre>
+<p>而應產生：</p>
+<pre>Artifact
++
+Evidence Package</pre>
+<p>例如：</p>
+<pre>commit SHA
+
+requirements
+
+spec version
+
+architecture version
+
+tests run
+
+coverage
+
+static analysis
+
+property tests
+
+proof result
+
+browser acceptance
+
+security scan
+
+known limitations</pre>
+<p>所以 release bundle 可以想成：</p>
+<pre>Code
++
+Spec
++
+Proof
++
+Evidence</pre>
+<p>目前也已經出現把 deterministic verification contracts、isolated execution 與 tamper-evident evidence 放進 autonomous software engineering 流程的專案。</p>
+
+<h2 id="s22">二十二、Software Factory 會形成 Feedback Loop</h2>
+<p>真正的 Factory 還有另一個特性：</p>
+<pre>Failure
+ ↓
+Root Cause
+ ↓
+New Rule
+ ↓
+Factory Updated
+ ↓
+所有未來 Agent 都不再犯</pre>
+<p>這比：</p>
+<pre>某個工程師學到教訓</pre>
+<p>強很多。</p>
+<p>Factory 的知識會累積成：</p>
+<pre>Constraint Library
+Regression Library
+Failure Pattern Library
+Architecture Rules
+Security Rules
+Proof Lemmas</pre>
+<p>因此：</p>
+<pre>Factory Age ↑
+
+Factory Reliability ↑</pre>
+<p>這才是真正的「工廠」。</p>
+
+<h2 id="s23">二十三、AI Software Factory 2.0</h2>
+<p>完整架構可以整理成：</p>
+<pre>┌──────────────────────────────┐
+│           HUMAN              │
+│ Intent / Product / Policy    │
+└──────────────┬───────────────┘
+               ↓
 ┌──────────────────────────────┐
-│ 依風險分級的 Deterministic    │
-│ Checker（L0 ~ L5）            │
-└──────────────────────────────┘
-        ↓
-Pass / Fail ──Fail──→ 回到 AI 重試（有次數與成本上限）
-        ↓ Pass
-Evidence 封存 → Release Gate</pre>
-<p>分工是：<strong>AI 負責搜尋解法，機器負責判定，人負責定義「什麼叫對」。</strong></p>
+│ REQUIREMENT LAYER            │
+│ Requirement / Acceptance     │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ SPECIFICATION LAYER          │
+│ Contract / Invariant / FSM   │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ PLANNING LAYER               │
+│ Architecture / Task Graph    │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ GENERATION LAYER             │
+│ Coding Agents                │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ VERIFICATION LAYER           │
+│                              │
+│ Type                         │
+│ Static Analysis              │
+│ Unit                         │
+│ Property                     │
+│ Fuzz                         │
+│ Integration                  │
+│ E2E                          │
+│ Model Check                  │
+│ Formal Proof                 │
+│ Security                     │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ ACCEPTANCE LAYER             │
+│ Browser / Runtime / Staging  │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ EVIDENCE LAYER               │
+│ Trace / Proof / Report       │
+└──────────────┬───────────────┘
+               ↓
+┌──────────────────────────────┐
+│ RELEASE                      │
+└──────────────────────────────┘</pre>
 
-<h2><span class="n">七</span>Evidence 的具體形態</h2>
-<p>「Evidence」必須是可稽核的實物，而不是一句「已驗證」：</p>
-<ul>
-<li>型別檢查與靜態分析報告</li>
-<li>測試結果、覆蓋率、<strong>突變測試分數</strong>（用來檢驗測試本身的品質）</li>
-<li>屬性測試的種子與反例紀錄</li>
-<li>Proof artifact 與 checker 版本</li>
-<li>規格版本與人工審閱紀錄</li>
-<li>驗證所用工具鏈的版本與雜湊</li>
-</ul>
+<h2 id="s24">二十四、Human 的角色最後會改變</h2>
+<p>傳統：</p>
+<pre>Human
+=
+Code Writer</pre>
+<p>AI Coding：</p>
+<pre>Human
+=
+AI Supervisor</pre>
+<p>Software Factory：</p>
+<pre>Human
+=
+Requirement
++
+Architecture
++
+Review</pre>
+<p>Verifiable Software Factory：</p>
+<pre>Human
+=
+Intent
++
+Policy
++
+Specification
++
+Exception Handling</pre>
+<p>因此未來最重要的能力之一可能不是：</p>
+<blockquote>如何寫更多 code。</blockquote>
+<p>而會是：</p>
+<blockquote><strong>如何精確描述「什麼一定要成立」。</strong></blockquote>
 
-<h2><span class="n">八</span>風險與未解問題</h2>
-<ol>
-<li><strong>證明失敗時怎麼辦</strong>：LLM 反覆重試的成本需要預算上限，超過就轉人工或降級驗證層級。</li>
-<li><strong>證明通過但規格有漏洞</strong>：責任歸屬要事先定義，否則 Evidence 會製造虛假的安全感。</li>
-<li><strong>工具鏈的信任基礎</strong>：checker 與 kernel 本身必須小而可信，且版本鎖定。</li>
-<li><strong>適用範圍界線</strong>：每個專案應明確標示哪些模組在哪個驗證層級，不要用一句「已驗證」概括整個系統。</li>
-<li><strong>目前的證據不足</strong>：LLM 產生複雜 proof 的成功率與成本，仍待實測，不能當作已成立的趨勢。</li>
-</ol>
+<h2 id="s25">二十五、這也是 Formal Methods 可能重新崛起的原因</h2>
+<p>Formal Methods 過去最大的問題是：</p>
+<pre>ROI 太低</pre>
+<p>不是：</p>
+<pre>技術沒有用。</pre>
+<p>Kleppmann 引用 seL4 的經典案例說明，以當年的工程條件來看，8,700 行 C 對應到了約 20 人年的 verification effort 與大約 20 萬行 Isabelle proof，這種成本當然使 Formal Verification 很難成為一般商業軟體工程的預設流程。</p>
+<p>AI 改變的是：</p>
+<pre>Proof Production Cost</pre>
+<p>如果從：</p>
+<pre>Expert Human</pre>
+<p>轉成：</p>
+<pre>AI Search
++
+Proof Checker</pre>
+<p>成本曲線就可能完全不同。</p>
+<p>這也是近年的 AI verified-software 研究開始快速增加的原因。CMU 的相關研究計畫就直接以「讓 machine-checkable guarantees 成為 routine software development」為目標。</p>
 
-<h2><span class="n">九</span>落地建議</h2>
-<ol>
-<li><strong>全面做 L0 到 L2</strong>：型別、靜態分析、測試，由 AI 大量產出並自動把關。</li>
-<li><strong>對核心邏輯加 L3</strong>：導入屬性測試與突變測試，專門對付「AI 自己寫的測試太容易通過」。</li>
-<li><strong>挑 1 到 2 個高風險模組試 L4 或 L5</strong>，用實測數據評估成本，而不是先假設會成功。</li>
-<li><strong>建立 Specification Review 關卡</strong>，由人負責，並把規格版本納入 Evidence。</li>
-<li><strong>為每個模組標註驗證等級</strong>，讓 Release 決策建立在可見的證據上。</li>
-</ol>
+<h2 id="s26">二十六、但距離 Repo-Level 全自動 Formal Software Factory 還很遠</h2>
+<p>不能把目前技術說得太成熟。</p>
+<p>2026 年 Vero benchmark 已經開始測試：</p>
+<pre>Multi-module repository
++
+Implementation
++
+Formal Proof</pre>
+<p>而不是只測一個函式。</p>
+<p>結果顯示，即使是強力 coding-agent configuration，在 43 個 repository-level instances 中也只能完整解決其中 27 個，而且最困難的 repository 仍然無法完全閉合 specification。</p>
+<p>因此現在比較準確的判斷是：</p>
+<pre>Formal AI Coding
+=
+正在快速進步
 
-<h2><span class="n">十</span>一句話總結</h2>
-<blockquote class="final">AI 負責搜尋解法，機器依風險分級判定，人負責定義什麼叫對。<br>Software Factory 的競爭力不在於產得多，而在於<strong>每一份產出都附帶與其風險相稱的證據</strong>。</blockquote>
+但不是
+=
+已成熟可全面取代一般開發</pre>
 
-<footer>AI Software Factory 2.0 · 修訂版</footer>
+<h2 id="s27">二十七、實際導入路線</h2>
+<p>最務實的 Software Factory roadmap 應該是：</p>
+<h3>Phase 1</h3>
+<p>先建立：</p>
+<pre>CI
+Unit Test
+Integration Test
+E2E
+Static Analysis
+Build Gate</pre>
+<h3>Phase 2</h3>
+<p>建立：</p>
+<pre>Architecture Contract
+Executable Contract
+State Machine
+Invariant
+Property Test</pre>
+<h3>Phase 3</h3>
+<p>建立：</p>
+<pre>Agentic Implementation
+Agent Review
+Agent Test Generation
+Adversarial Agent</pre>
+<h3>Phase 4</h3>
+<p>導入：</p>
+<pre>Model Checking
+SMT
+Symbolic Execution</pre>
+<h3>Phase 5</h3>
+<p>只對關鍵 domain 導入：</p>
+<pre>Formal Specification
+Formal Proof</pre>
+
+<h2 id="s28">二十八、ERP 最好的第一批 Formal Targets</h2>
+<p>建議優先考慮：</p>
+<pre>Accounting
+Inventory
+Payment
+Authorization
+Workflow
+Settlement
+Data migration</pre>
+<p>例如：</p>
+<h3>Accounting</h3>
+<p>Invariant：</p>
+<pre>Σ Debit
+=
+Σ Credit</pre>
+<h3>Inventory</h3>
+<p>Invariant：</p>
+<pre>庫存不得無合法 transaction 改變</pre>
+<h3>Permission</h3>
+<p>Invariant：</p>
+<pre>Unauthorized user
+
+永遠不存在
+
+sensitive operation execution path</pre>
+<h3>Workflow</h3>
+<p>Invariant：</p>
+<pre>非法 state transition
+不可達</pre>
+<p>這些比：</p>
+<pre>CRUD Page
+Dashboard
+CSS
+UI</pre>
+<p>有價值得多。</p>
+
+<h2 id="s29">二十九、遊戲專案最好的第一批 Formal Targets</h2>
+<p>則可以考慮：</p>
+<pre>Battle FSM
+Cutscene FSM
+Save / Load
+Inventory
+Quest State
+Transition Contract
+Resource ownership</pre>
+<p>例如：</p>
+<pre>BattleActive
+→
+WorldInputDisabled</pre>
+<pre>BattleExit
+→
+BattleTimerCount = 0</pre>
+<pre>CutsceneEnd
+→
+MovementSpeed = Normal</pre>
+<pre>LoadSuccess
+→
+不存在舊 Session owner</pre>
+<p>這些非常適合逐步從：</p>
+<pre>regression test</pre>
+<p>走向：</p>
+<pre>state-machine verification</pre>
+
+<h2 id="s30">三十、最終判斷</h2>
+<p>AI Software Factory 的競爭最後不會只是：</p>
+<pre>誰有最強模型</pre>
+<p>因為模型會快速普及。</p>
+<p>真正的 moat 更可能是：</p>
+<pre>Specification Library
+
+Architecture Rules
+
+Contracts
+
+Regression Corpus
+
+Verification Pipeline
+
+Domain Invariants
+
+Failure Knowledge
+
+Evidence System</pre>
+<p>換句話說：</p>
+<blockquote><strong>Agent 不是 Factory。</strong></blockquote>
+<p>真正的 Factory 是：</p>
+<blockquote><strong>一個能把不可靠的智慧生成器，包在可靠約束裡面的系統。</strong></blockquote>
+<p>因此未來軟體工程可能會從：</p>
+<pre>Trust the developer</pre>
+<p>走向：</p>
+<pre>Trust the process</pre>
+<p>再進一步走向：</p>
+<pre>Trust the proof.</pre>
+<p>而 AI 最重要的作用，不是取代 deterministic verification。</p>
+<p>正好相反：</p>
+<blockquote><strong>AI 讓 deterministic verification 第一次有機會在經濟上大規模普及。</strong></blockquote>
+<p>這可能才是 AI Coding 革命比「自動寫程式」更深的一層。</p>
+
+<footer>AI Software Factory 2.0</footer>
 </main>
+<script>
+  // 依各節標題產生目錄；無 JS 時目錄保持隱藏
+  (function () {
+    var toc = document.getElementById('toc');
+    var list = toc.querySelector('ol');
+    document.querySelectorAll('main h2[id]').forEach(function (h) {
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.href = '#' + h.id;
+      a.textContent = h.textContent.replace(/^[一二三四五六七八九十]+、/, '');
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+    toc.hidden = false;
+  })();
+</script>
 </body>
 </html>
