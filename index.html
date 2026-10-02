@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Software Factory 2.0</title>
+<meta name="description" content="從 Agentic Coding 到分級驗證的軟體工程">
+<style>
+  :root {
+    --bg: #fafaf7; --fg: #1f2328; --muted: #5b636b; --line: #dcdcd4;
+    --accent: #1a5fb4; --card: #ffffff; --code: #f0efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #15171a; --fg: #e6e6e1; --muted: #9aa2aa; --line: #2e3237;
+      --accent: #6cb0ff; --card: #1c1f23; --code: #23272c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 17px/1.8 -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+  }
+  main { max-width: 820px; margin: 0 auto; padding: 48px 16px 96px; }
+  h1 { font-size: 2.2rem; line-height: 1.25; margin: 0 0 .3em; }
+  .sub { color: var(--muted); font-size: 1.1rem; margin-bottom: 2.5rem; }
+  h2 { font-size: 1.45rem; margin: 3rem 0 .8rem; padding-top: 1rem; border-top: 1px solid var(--line); }
+  h2 .n { color: var(--accent); margin-right: .4em; }
+  blockquote {
+    margin: 1.2rem 0; padding: .8rem 1.2rem; background: var(--card);
+    border-left: 4px solid var(--accent); border-radius: 0 8px 8px 0; font-size: 1.1rem;
+  }
+  pre {
+    background: var(--code); padding: 1rem 1.2rem; border-radius: 8px;
+    overflow-x: auto; font: 14px/1.6 ui-monospace, Menlo, monospace;
+  }
+  .table-wrap { overflow-x: auto; margin: 1rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; background: var(--card); }
+  th, td { border: 1px solid var(--line); padding: .55rem .8rem; text-align: left; vertical-align: top; }
+  th { background: var(--code); }
+  ul, ol { padding-left: 1.4rem; }
+  li { margin: .3rem 0; }
+  .final { font-size: 1.15rem; }
+  footer { margin-top: 4rem; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<main>
+<h1>AI Software Factory 2.0</h1>
+<p class="sub">從 Agentic Coding 到分級驗證的軟體工程</p>
+
+<h2><span class="n">一</span>核心結論</h2>
+<p>AI 正在讓「產生 code」的成本趨近於零。Software Factory 的瓶頸因此從「誰寫得快」轉為：</p>
+<blockquote>我們憑什麼相信 AI 產生的東西是對的？而且信到什麼程度？</blockquote>
+<p>下一階段的重點不是增加更多 Agent，而是建立<strong>分級驗證</strong>。每個產出物都要有與其風險相稱的證據：</p>
+<pre>Specification → Generation → Verification → Evidence → Release</pre>
+<p>這個主張有兩個前提。第一，驗證強度是一條光譜，不是「有證明 / 沒證明」的二選一。第二，驗證只能保證「產出符合規格」，<strong>規格本身是否正確，仍然需要人來把關</strong>。</p>
+<p>Martin Kleppmann 在 2025 年的判斷是：Formal Verification 過去沒有普及，主因是人工撰寫 proof 的成本太高。如果 LLM 能大量產生 proof，再由 deterministic proof checker 判定，其經濟結構<em>有可能</em>改變。這是條件式的預測，目前仍需要實證。</p>
+
+<h2><span class="n">二</span>四個階段（並存，而非取代）</h2>
+<div class="table-wrap"><table>
+<tr><th>階段</th><th>特徵</th><th>主要限制</th></tr>
+<tr><td>1. 傳統工程</td><td>人設計、人寫、人審</td><td>產能 ≈ 工程師數量 × 速度</td></tr>
+<tr><td>2. AI Coding</td><td>Prompt → AI 產碼 → 人審</td><td>產碼速度超過審查與測試速度</td></tr>
+<tr><td>3. Agentic Factory</td><td>多 Agent 分工，有 sandbox、quality gate、audit evidence、approval gate</td><td>驗證者與生成者同為機率模型</td></tr>
+<tr><td>4. Verifiable Engineering</td><td>關鍵產出物由確定性機制判定</td><td>規格正確性、適用範圍、驗證成本</td></tr>
+</table></div>
+<p>實務上這四個階段會同時存在。多數系統停在 Stage 3，只有高風險模組才導入 Stage 4。</p>
+
+<h2><span class="n">三</span>Multi-Agent 為何不能保證正確性</h2>
+<p>假設 Agent A 寫程式，B 審查，C 寫測試，D 做安全審查。四者都是機率模型，會有<strong>相關性失敗</strong>：共享訓練偏誤，可能一起接受同一個錯誤假設。</p>
+<p>這能顯著提高品質，但沒有取得正確性保證。同樣的問題也出現在 AI 自己寫的測試：測試執行是確定性的，但測試案例只覆蓋 AI 想到的情境，這不等於正確性證明。</p>
+
+<h2><span class="n">四</span>驗證強度光譜</h2>
+<p>「Deterministic」不是單一概念。各層保證的強度與成本差異很大：</p>
+<div class="table-wrap"><table>
+<tr><th>層級</th><th>機制</th><th>保證的內容</th><th>典型適用</th></tr>
+<tr><td>L0</td><td>Lint、格式檢查</td><td>風格一致</td><td>全部程式碼</td></tr>
+<tr><td>L1</td><td>型別系統、靜態分析</td><td>排除一整類錯誤</td><td>全部程式碼</td></tr>
+<tr><td>L2</td><td>範例測試、整合測試</td><td>已列舉情境成立</td><td>全部功能</td></tr>
+<tr><td>L3</td><td>屬性測試、突變測試、契約測試</td><td>較廣的輸入空間與測試品質</td><td>核心業務邏輯、API 邊界</td></tr>
+<tr><td>L4</td><td>模型檢查</td><td>有限狀態空間內窮舉</td><td>狀態機、協定、併發</td></tr>
+<tr><td>L5</td><td>定理證明（Formal Proof）</td><td>對規格的數學保證</td><td>密碼學、金流核心、安全關鍵</td></tr>
+</table></div>
+<p>原則是依風險選層級，不要一律追求 L5。L0 到 L2 的 AI 產出物已經可以大量自動化。越往上，成本越高，適用範圍越窄。</p>
+
+<h2><span class="n">五</span>規格才是新的瓶頸</h2>
+<p>Proof checker 只能回答「程式是否符合規格」，無法回答「規格是否符合使用者真正要的東西」。</p>
+<ul>
+<li>形式規格本身需要人撰寫，也可能寫錯。</li>
+<li>若讓 LLM 同時產生規格與證明，checker 只保證兩者互相一致。相關性失敗只是從程式層搬到規格層。</li>
+<li>多數業務系統（CRUD、報表、UI、第三方整合、權限規則）沒有現成的形式規格可寫。</li>
+</ul>
+<p>因此流程中必須有一道<strong>人類主導的 Specification Review</strong>。它是獨立關卡，不能被 AI 的自我審查取代。</p>
+
+<h2><span class="n">六</span>確定性驗證層架構</h2>
+<pre>Human: 寫作 / 審閱 Specification  ← 人類把關點
+        ↓
+AI: 生成 Artifact（code / test / proof）
+        ↓
+┌──────────────────────────────┐
+│ 依風險分級的 Deterministic    │
+│ Checker（L0 ~ L5）            │
+└──────────────────────────────┘
+        ↓
+Pass / Fail ──Fail──→ 回到 AI 重試（有次數與成本上限）
+        ↓ Pass
+Evidence 封存 → Release Gate</pre>
+<p>分工是：<strong>AI 負責搜尋解法，機器負責判定，人負責定義「什麼叫對」。</strong></p>
+
+<h2><span class="n">七</span>Evidence 的具體形態</h2>
+<p>「Evidence」必須是可稽核的實物，而不是一句「已驗證」：</p>
+<ul>
+<li>型別檢查與靜態分析報告</li>
+<li>測試結果、覆蓋率、<strong>突變測試分數</strong>（用來檢驗測試本身的品質）</li>
+<li>屬性測試的種子與反例紀錄</li>
+<li>Proof artifact 與 checker 版本</li>
+<li>規格版本與人工審閱紀錄</li>
+<li>驗證所用工具鏈的版本與雜湊</li>
+</ul>
+
+<h2><span class="n">八</span>風險與未解問題</h2>
+<ol>
+<li><strong>證明失敗時怎麼辦</strong>：LLM 反覆重試的成本需要預算上限，超過就轉人工或降級驗證層級。</li>
+<li><strong>證明通過但規格有漏洞</strong>：責任歸屬要事先定義，否則 Evidence 會製造虛假的安全感。</li>
+<li><strong>工具鏈的信任基礎</strong>：checker 與 kernel 本身必須小而可信，且版本鎖定。</li>
+<li><strong>適用範圍界線</strong>：每個專案應明確標示哪些模組在哪個驗證層級，不要用一句「已驗證」概括整個系統。</li>
+<li><strong>目前的證據不足</strong>：LLM 產生複雜 proof 的成功率與成本，仍待實測，不能當作已成立的趨勢。</li>
+</ol>
+
+<h2><span class="n">九</span>落地建議</h2>
+<ol>
+<li><strong>全面做 L0 到 L2</strong>：型別、靜態分析、測試，由 AI 大量產出並自動把關。</li>
+<li><strong>對核心邏輯加 L3</strong>：導入屬性測試與突變測試，專門對付「AI 自己寫的測試太容易通過」。</li>
+<li><strong>挑 1 到 2 個高風險模組試 L4 或 L5</strong>，用實測數據評估成本，而不是先假設會成功。</li>
+<li><strong>建立 Specification Review 關卡</strong>，由人負責，並把規格版本納入 Evidence。</li>
+<li><strong>為每個模組標註驗證等級</strong>，讓 Release 決策建立在可見的證據上。</li>
+</ol>
+
+<h2><span class="n">十</span>一句話總結</h2>
+<blockquote class="final">AI 負責搜尋解法，機器依風險分級判定，人負責定義什麼叫對。<br>Software Factory 的競爭力不在於產得多，而在於<strong>每一份產出都附帶與其風險相稱的證據</strong>。</blockquote>
+
+<footer>AI Software Factory 2.0 · 修訂版</footer>
+</main>
+</body>
+</html>
