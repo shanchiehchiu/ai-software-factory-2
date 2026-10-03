@@ -332,16 +332,6 @@ public function test_concurrent_close_does_not_produce_illegal_transition(): voi
 <tr><td>3 結案（未出貨）</td><td>刪除銷貨單</td><td>不動（reopen 只管 2→1）</td></tr>
 </table></div>
 
-<h3>Commits（ERP repo master）</h3>
-<ul>
-<li><code>36596aa2</code> 借貸 invariant + 庫存寫入白名單</li>
-<li><code>20e511c9</code> SalesOrder frozen requirement + Quint model</li>
-<li><code>b565ebc3</code> invariant 進 SummonService 咽喉點</li>
-<li><code>2b047fc9</code> reopen() 修繞道寫入</li>
-<li><code>22043ef5</code> close(2) 冪等</li>
-<li><code>f51a8d43</code> 狀態 3 正名為「結案（未出貨）」+ 恢復 toggle</li>
-<li><code>7e6255d3</code> 狀態寫入路徑白名單 + Q4 查明</li>
-</ul>
 <blockquote><strong>這一輪證明了方法論可行：兩個模型反例都在真實程式重現、經業務裁定後修復、重建模型 re-verify 全綠、留下 regression 守門。下一個可套用的目標：傳票狀態機、庫存調撥雙方鎖定、或銷退單的數量守恆。</strong></blockquote>
 
 <footer>AI Software Factory 2.0 · ERP 實戰案例 · 對應實際 Laravel ERP 程式碼</footer>
