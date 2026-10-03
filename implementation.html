@@ -29,6 +29,7 @@
   .backlink a { color: var(--accent); text-decoration: none; }
   .backlink a:hover { text-decoration: underline; }
   h2 { font-size: 1.45rem; line-height: 1.4; margin: 3rem 0 .8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); scroll-margin-top: 1rem; }
+  p.plain { color: var(--muted); font-size: .88rem; margin: -.3rem 0 1rem; padding-left: .8rem; border-left: 3px solid var(--accent); }
   h3 { font-size: 1.15rem; margin: 2rem 0 .5rem; color: var(--accent); scroll-margin-top: 1rem; }
   p { margin: .8rem 0; }
   blockquote {
@@ -126,7 +127,34 @@
 <div class="toolbar"><button id="expand-all" type="button">全部展開</button><button id="collapse-all" type="button">全部收合</button></div>
 <details class="toc" id="toc" hidden><summary>目錄</summary><ol></ol></details>
 
+<h2 id="s0">〇、白話版：這套東西到底在幹嘛</h2>
+<p>用一個每天都在發生的例子講完整個方法：<strong>檢查便當店出餐流程</strong>。</p>
+<p>便當店有一條規矩：「接了單就一定要有出餐記錄，不能憑空消失。」過去這條規矩只存在老闆腦子裡，新人做錯了才被罵。這套方法就是把這種「腦子裡的規矩」變成機器會自動檢查的東西，分四步：</p>
+<ol>
+<li><strong>寫下規矩</strong>（Frozen Requirement）：把「接了單一定要有出餐記錄」白紙黑字寫下來，老闆簽名認可。這份文件之後不能再隨便改，不然檢查的標準本身在動。</li>
+<li><strong>做一個迷你廚房</strong>（Model）：不是真的廚房，是一個可以在電腦裡演練的小模型——只有三種狀態：接單、製作中、已出餐。</li>
+<li><strong>請奧客來亂搞一萬次</strong>（State Exploration）：讓 checker 在迷你廚房裡亂玩——接單不出餐、出餐完又退單、兩個人同時改同一張單……玩一萬遍，每次檢查規矩有沒有被破壞。人腦想不到的怪招它會試出來。</li>
+<li><strong>回真廚房驗證</strong>（Replay）：奧客若在迷你廚房成功搞砸（例如「同時按退單和出餐，單就不見了」），要回真正的廚房照同樣步驟做一次，確認真的會出事——迷你廚房畢竟是簡化的，可能誤報。</li>
+</ol>
+<p>找到真的會搞砸的狀況 → 修流程 → 規矩文件和迷你廚房同步更新 → 留一個自動檢查防止以後再壞。整個手冊下面就是在講這四步怎麼在軟體專案裡做。</p>
+<h3>術語對照表（看不懂時回來查）</h3>
+<div class="table-wrap"><table>
+<tr><th>術語</th><th>白話</th><th>便當店比喻</th></tr>
+<tr><td>Requirement / Spec</td><td>規矩本身，白紙黑字</td><td>「接了單一定要有出餐記錄」</td></tr>
+<tr><td>Invariant</td><td>規矩的檢查公式，跑起來會回 true/false</td><td>檢查員手上的打分表</td></tr>
+<tr><td>Model</td><td>真實程式的迷你版，可以讓機器亂玩</td><td>迷你廚房</td></tr>
+<tr><td>State / Transition</td><td>訂單現在在哪個狀態／怎麼跳過去</td><td>接單→製作中→已出餐</td></tr>
+<tr><td>State Exploration</td><td>把所有可能操作順序都試一遍</td><td>奧客亂搞一萬次</td></tr>
+<tr><td>Counterexample</td><td>checker 找到的一組會搞砸的操作順序</td><td>「先退單再出餐，單就消失」</td></tr>
+<tr><td>Replay</td><td>把搞砸步驟拿到真實程式重做一次</td><td>回真廚房照做一遍</td></tr>
+<tr><td>Witness</td><td>證明檢查有真的走到重要情境，不是空跑</td><td>確認演練中真的有出過餐</td></tr>
+<tr><td>Mutation</td><td>故意把好東西弄壞，看檢查員會不會發現</td><td>拔掉瓦斯看檢查員叫不叫</td></tr>
+<tr><td>Vacuous truth</td><td>檢查看起來全過，但其實根本沒驗到</td><td>「所有出餐都合格」但根本沒出過餐</td></tr>
+</table></div>
+<blockquote><strong>讀法建議：時間不夠就看這節 + 各節開頭的白話句；要動手才細讀步驟內容。</strong></blockquote>
+
 <h2 id="s1">一、核心原則：Generator ≠ Judge</h2>
+<p class="plain">白話：出考卷的人不能自己改考卷——寫程式的和判對錯的要是兩套東西。</p>
 <p>整個方法論可以壓縮成一條規則：</p>
 <blockquote><strong>產生答案的系統，不能同時是判定答案正確的系統。</strong></blockquote>
 <p>因此 Factory 實際上是兩條彼此獨立的 pipeline：</p>
@@ -162,6 +190,7 @@
 <p>Formal pipeline 不是 CI 裡多掛一個步驟，它是 Factory 的<strong>第二套 correctness engine</strong>。AI 可以產生 implementation，但「什麼叫正確」由另一套 executable specification 決定。</p>
 
 <h2 id="s2">二、Step 0 — 選擇值得建模的目標</h2>
+<p class="plain">白話：不是所有東西都值得這樣搞。挑「規矩多、出錯很貴、人腦容易漏」的地方——狀態機、錢、庫存這種。</p>
 <p>不是所有程式都值得建 formal model。先過這張篩選表，符合越多越值得做：</p>
 <div class="table-wrap"><table>
 <tr><th>類型</th><th>特徵</th><th>例子</th></tr>
@@ -175,6 +204,7 @@
 <blockquote>判斷標準：如果你能把需求寫成「∀ state：某條件必須成立」，就值得建模。</blockquote>
 
 <h2 id="s3">三、Step 1 — Frozen Requirement：只從需求寫規格</h2>
+<p class="plain">白話：規矩要照「應該怎樣」寫，不能照「程式現在怎樣」寫——不然 bug 會被你寫進規矩裡當成對的。</p>
 <p>這是最容易被跳過、也最重要的一步。把業務規則先固定成編號條文（R1、R2 … Rn），寫進一份獨立的規格檔（例如 <code>source.md</code>）。</p>
 <p>此階段的硬性紀律：</p>
 <pre>只看需求
@@ -193,8 +223,10 @@
 <li>失敗的 transaction 算不算 committed history？（裁定：不算）</li>
 </ul>
 <blockquote><strong>人類在這裡的工作不是 review code，是決定世界的規則。</strong></blockquote>
+<p>實戰教訓：<strong>命名會說謊，語意要從「程式如何使用」驗證，不能只看標籤</strong>。某 ERP 的訂單狀態欄位值 3 在資料表叫「取消」，但程式把它和值 2 一起視為「已結案」、UI 是「結案／取消結案」toggle——它實際是「手動結案」。若照名字把 3 寫成「取消且為終態」的規格，會砍掉一個真實存在的重開功能。裁定模糊地帶前，先查程式如何消費這個值。</p>
 
 <h2 id="s4">四、Step 2 — Invariant Registry：把規則變成可計算的 predicate</h2>
+<p class="plain">白話：把「借貸要相等」這種句子翻譯成電腦算得出 true/false 的式子，一條規矩對應一個式子。</p>
 <p>自然語言「已送達訂單不得取消」必須變成 machine-checkable property：</p>
 <pre>∀ transition:
   previous == DELIVERED
@@ -215,6 +247,7 @@ INV_onlyPermittedTransitions
 INV_committedWritesAreSequentialAndFresh</pre>
 
 <h2 id="s5">五、Step 3 — As-Is Model：投影 production，不是寫理想模型</h2>
+<p class="plain">白話：迷你廚房要照真廚房現在的樣子蓋（包括它原本的毛病），不是照你理想中的樣子——不然驗證的不是現實。</p>
 <p>Model 的本體論定位要分清：</p>
 <pre>Requirement → Invariant  = Authority（世界應該如何）
 Production → As-Is Model = Projection（程式實際如何）</pre>
@@ -233,6 +266,7 @@ A.read NEW ── B.read NEW ── A.commit DELIVERED ── B.commit CANCELLED
 </ul>
 
 <h2 id="s6">六、Step 4 — State Exploration：讓 checker 當 systematic adversary</h2>
+<p class="plain">白話：checker 的工作就是想辦法搞砸。它把所有操作順序排列組合亂試，專挑人想不到的怪順序。</p>
 <p>不要自己寫 testcase 列舉情境，讓工具在 state space 裡走 action sequence，每到一個 state 就檢查全部 invariant：</p>
 <pre>Initial State
      │
@@ -245,6 +279,7 @@ A.read NEW ── B.read NEW ── A.commit DELIVERED ── B.commit CANCELLED
 <blockquote>對外溝通時講精確：「Formal Specification + Executable Model + Bounded/Sampled Exploration」，不要說「系統已被證明正確」。</blockquote>
 
 <h2 id="s7">七、Step 5 — Counterexample → Production Replay（雙重驗證）</h2>
+<p class="plain">白話：迷你廚房找到問題只能算「嫌疑」，要回真廚房照做一次確認真的會壞，才算數。</p>
 <p>Formal model 找出的東西是<strong>候選 defect，不是已定案 bug</strong>。模型可能有建模誤差，所以流程上多一道 replay：</p>
 <pre>Formal Counterexample
         ↓
@@ -262,6 +297,7 @@ Confirmed Defect</pre>
 </ul>
 
 <h2 id="s8">八、Step 6 — 修復後重建模型，不把模型調綠</h2>
+<p class="plain">白話：修好之後要重蓋迷你廚房再驗一次；絕對不能為了讓檢查過關而去改迷你廚房的規矩。</p>
 <p>修完 bug 之後<strong>不要</strong>改 model 改到 pass。舊模型描述的是修復前的系統，不是永恆的規格：</p>
 <pre>重新讀 production code
         ↓
@@ -271,6 +307,7 @@ Confirmed Defect</pre>
 <p>只有 Invariant 是 authority；Model 是 production 的投影，production 變了 model 就要重投影。把「修改 model 直到綠燈」當作流程上的 anti-pattern 明文禁止。</p>
 
 <h2 id="s9">九、Step 7 — Witness 與 Mutation：證明「全綠」不是空轉</h2>
+<p class="plain">白話：檢查全過有兩種可能：真的沒問題，或檢查根本沒跑到重點。用兩招分辨——確認重要情境有被走到（witness）、故意弄壞看檢查會不會叫（mutation）。</p>
 <h3>Witness — 防 vacuous truth</h3>
 <p>「所有 DELIVERED 訂單都符合 X」在模型根本走不到 DELIVERED 時會 vacuously 成立。所以要為重要狀態定義 witness（「某件事確實發生過」）：</p>
 <pre>witness: DELIVERED reached
@@ -287,8 +324,11 @@ witness: concurrent scenario reached</pre>
 <tr><td>createOrder 直接建 SHIPPED</td><td>R1 FAIL</td></tr>
 </table></div>
 <blockquote>Correct system → GREEN、Known broken system → RED，兩者都成立才算 checker 有 sensitivity。</blockquote>
+<h3>反向紀律 — 修復後要砍掉空轉的檢查</h3>
+<p>vacuous green 不只發生在「狀態走不到」，也發生在「規則被修掉了」。當某條 invariant 針對的缺口經裁定修復、該違規在模型中結構性地不可能再發生時，要連同它的追蹤狀態一起移除，而不是留著一個永遠綠的檢查假裝還在驗證。實戰例：「close() 對結案單有定義」這條 invariant 在裁定「冪等回傳」並實作後，觸發它的旗標成為永遠 false 的死狀態——整個機制刪除才是誠實的驗證。</p>
 
 <h2 id="s10">十、Formal Work Item 有自己的狀態機</h2>
+<p class="plain">白話：驗證工作本身也要追蹤進度——規格草稿、模型建好、找到反例、修復完成，每一步都有狀態。</p>
 <p>形式化驗證工作本身也應該是一個被追蹤的 flow，而不是散落的 PR：</p>
 <pre>DRAFT_REQUIREMENT
         ↓
@@ -331,6 +371,7 @@ PASS          COUNTEREXAMPLE
 <p>每個階段的產出物（spec 版本、invariant 檔、counterexample trace、replay 測試、witness/mutation 報告）都進 Evidence Store。</p>
 
 <h2 id="s11">十一、角色分工總表</h2>
+<p class="plain">白話：誰負責什麼——AI 寫程式跑檢查、人類定規矩和裁定模糊地帶。</p>
 <div class="table-wrap"><table>
 <tr><th>角色</th><th>職責</th><th>可替換性</th></tr>
 <tr><td>Human</td><td>Semantic Authority：定義需求、裁定語意、批准 invariant</td><td>不可被 AI 取代</td></tr>
@@ -341,6 +382,7 @@ PASS          COUNTEREXAMPLE
 </table></div>
 
 <h2 id="s12">十二、落地 Checklist 與界線</h2>
+<p class="plain">白話：照這個清單做就不會漏；以及先講清楚這套方法做不到什麼，免得期待落空。</p>
 <h3>最小可行流程</h3>
 <ol>
 <li>選 1 個狀態機或 resource invariant 明確的 aggregate</li>
