@@ -295,30 +295,52 @@ public function test_concurrent_close_does_not_produce_illegal_transition(): voi
 </ul>
 <blockquote><strong>最小第一步：不用裝任何新工具。先把 <code>VoucherBalanceInvariant</code> 抽出來、把三份 <code>array_sum</code> 收編——今天就做得到。</strong></blockquote>
 
-<h2 id="s10">十、執行結果紀實（2026-10 實際跑完一輪）</h2>
-<p>上述計畫已全部執行，以下是真實結果而非預期。</p>
+<h2 id="s10">十、執行結果紀實 — 照手冊 Step 0–7 跑完一輪</h2>
+<p>本節對照 <a href="implementation.html">實作手冊</a>的每個 Step，記錄在這個 ERP 實際發生的事。日期：2026-10。</p>
 
-<h3>完成的產出物</h3>
-<div class="table-wrap"><table>
-<tr><th>產出物</th><th>位置</th><th>狀態</th></tr>
-<tr><td>借貸平衡 invariant（單一裁判 + property/mutation 測試）</td><td><code>app/Service/Finance/VoucherBalanceInvariant.php</code><br><code>tests/Unit/Finance/VoucherBalanceInvariantTest.php</code></td><td>9 tests / 410 assertions 綠；已收編 SummonController ×2、VoucherTransferController；再進一步放入 <code>SummonService::store/update</code> 咽喉點，呼叫方無法略過</td></tr>
-<tr><td>庫存寫入路徑架構測試</td><td><code>tests/Unit/Arch/ProductStockWritePathTest.php</code><br><code>tests/Unit/Arch/ProductStockListWritePathTest.php</code></td><td>product_stocks 彙總表 0 繞道（原本就乾淨，測試把默契變明文）；明細檔 14 個寫入者白名單</td></tr>
-<tr><td>庫存守恆對帳（唯讀稽核）</td><td><code>tests/Feature/StockConservationAuditTest.php</code></td><td>stock = Σ增 − Σ減；測試庫無偏移</td></tr>
-<tr><td>SalesOrder frozen requirement + Quint model</td><td><code>fv/sales-order/{source.md,sales-order.qnt}</code></td><td>Q1–Q5 全數裁定；模型全綠，witness 72–97% 非空轉</td></tr>
-<tr><td>反例 replay 測試</td><td><code>tests/Feature/SalesOrderStateMachineReplayTest.php</code></td><td>兩個 counterexample 都在真實程式重現 → 修復 → 轉綠 regression</td></tr>
-<tr><td>狀態寫入路徑白名單</td><td><code>tests/Unit/Arch/SalesOrderStatusWritePathTest.php</code></td><td>R5 落實：sales_order_statuses_id 只能經 OrderService</td></tr>
-</table></div>
+<h3>Step 0 — 選目標</h3>
+<p>篩選表對應出三個缺口：<strong>狀態機</strong>（SalesOrder 的 1/2/3 轉換散在 Service/Controller）、<strong>Resource Invariant</strong>（借貸平衡、庫存守恆）、<strong>Concurrency</strong>（<code>close()</code> 是無鎖 read-then-write）。第一個建模對象選 SalesOrder——缺口最集中、 blast radius 最小。</p>
 
-<h3>兩個反例的完整循環</h3>
+<h3>Step 1 — Frozen Requirement</h3>
+<p>產出 <code>fv/sales-order/source.md</code>：狀態表（1=未結案／2=結案／3=結案-未出貨）、R1–R5 需求條文、Q1–Q5 語意裁定表。寫規格時撞上教科書沒提的坑——<strong>狀態名會說謊</strong>：值 3 標籤是「取消」，程式卻把它當「手動結案」用（<code>getCloseAttribute</code> 把 [2,3] 都算 closed）。先依「取消」裁定成終態，再從程式消費方式發現誤名，最後用 migration 正名為「結案（未出貨）」。規格跟著正名後的語意重寫。</p>
+
+<h3>Step 2 — Invariant Registry</h3>
+<p><code>sales-order.qnt</code> 的 <code>module invariants</code>：合法轉換集合 <code>{1→2, 1→3, 2→1, 3→1}</code>（每次裁定後回填）、<code>invOnlyLegalTransitions</code>、<code>invStatusInDomain</code>。金額守恆型的規矩沒有進 model——<code>VoucherBalanceInvariant</code> 用 PHP 單一裁判類更直接，放進 <code>SummonService</code> 寫入咽喉點，所有傳票寫入不可略過。</p>
+
+<h3>Step 3 — As-Is Model</h3>
+<p><code>module salesOrder</code> 照實際程式投影，不是理想版：<code>close()</code> 拆成 <code>t1Begin/t1Commit、t2Begin/t2Commit</code> 兩個交易，能交錯出 stale read；刪除銷貨單的 Controller 直寫也如實建模成繞道 action。Quint 不支援跨檔 import，invariants 與 model 以同檔雙 module 維持 authority/projection 分界。</p>
+
+<h3>Step 4 — State Exploration</h3>
+<p><code>quint run --max-samples=10000</code> 抓到兩個真反例：</p>
 <ul>
-<li><strong>undefined-close</strong>：對結案(2)訂單執行 <code>close()</code> 落入未定義的 <code>$updateData</code> → replay 確認 PHP 層「Undefined variable」洩漏 → 裁定「冪等回傳」→ 修復 → replay 轉綠</li>
-<li><strong>illegal-transition</strong>：刪除銷貨單時 Controller 無條件把訂單蓋回 1 → replay 確認結案單被繞道重開、手動結案單被誤解除 → 裁定「設計對、實作錯」→ 收進 <code>OrderService::reopen()</code> 僅允許 2→1 → replay 轉綠</li>
+<li><code>inv_onlyLegalTransitions</code> ❌ — 刪銷貨單對未結案單產生 1→1 同態寫入；結案單被繞道 2→1</li>
+<li><code>inv_closeDefined</code> ❌ — 對結案(2)執行 close 落入未定義分支</li>
+</ul>
+<p>反例 ITF trace 存證在 <code>fv/sales-order/counterexamples/</code>。</p>
+
+<h3>Step 5 — Counterexample → Replay</h3>
+<p><code>SalesOrderStateMachineReplayTest</code> 把兩條 trace 在真實 <code>OrderService</code>/<code>SalesSoldOrderController::destroy()</code> 上重播，雙雙 RED = defect confirmed（不是模型誤報）。</p>
+
+<h3>Step 6 — 修復 → 重建 → Re-verify</h3>
+<ul>
+<li>業務裁定 Q1（結案單按結案=冪等）、Q2 經由「正名」解開（status 3 實為手動結案，3→1 是合法 toggle）</li>
+<li><code>reopen()</code> 收進 Service、Controller 兩處直寫移除、<code>close()</code> 補 2/3 分支</li>
+<li>模型重投影（reopen 語意、2/3 冪等）、合法轉換集合同步裁定結果</li>
+<li>re-verify：<code>inv_onlyLegalTransitions</code>、<code>inv_statusInDomain</code> 全綠（10,000 traces）</li>
 </ul>
 
-<h3>教科書沒寫的兩個教訓</h3>
+<h3>Step 7 — Witness / Mutation</h3>
 <ul>
-<li><strong>狀態名會說謊</strong>：status 3 在資料表叫「取消」，但程式碼 <code>getCloseAttribute()</code> 把 [2,3] 都當已結案、UI 是「結案／取消結案」toggle——它實際是「手動結案（未出貨）」。依誤名把 3 裁定成終態會砍掉真功能。教訓：<strong>規格語意要從「程式如何使用」驗證，不能只看資料表標籤</strong>；最後以 migration 正名為「結案（未出貨）」。</li>
-<li><strong>修復後要砍 invariant</strong>：Q1 裁定後 <code>inv_closeDefined</code> 變成永遠不會觸發的空轉檢查（vacuous green），依紀律連同 <code>undefinedClose</code> flag 一起移除，而不是留著假裝還在驗證。</li>
+<li>Witness：<code>closedReached</code> 72%、<code>reopened</code> 87%、<code>bypass</code> 97% —— 非空轉</li>
+<li>Mutation：往 <code>app/</code> 塞假繞道檔案，白名單測試正確抓紅並列出檔名</li>
+<li>反向紀律實例：Q1 修復後 <code>inv_closeDefined</code> 結構上不可能再觸發 → 連同 <code>undefinedClose</code> 一併刪除，不留 vacuous green</li>
+</ul>
+
+<h3>教科書沒寫的教訓</h3>
+<ul>
+<li><strong>狀態名會說謊</strong>：寫規格前先查「程式怎麼消費這個值」，別信資料表標籤。</li>
+<li><strong>修復是雙向更新</strong>：code 修好了，spec 的合法集合也要回填裁定結果（2→1 從「違規」變「合法」），不然 invariant 會誤殺新行為。</li>
+<li><strong>invariant 也會過期</strong>：不再可能觸發的檢查要刪，全綠的清單應該每條都有活的意義。</li>
 </ul>
 
 <h3>修正後的狀態機（全部已定義）</h3>
@@ -331,7 +353,6 @@ public function test_concurrent_close_does_not_produce_illegal_transition(): voi
 <tr><td>3 結案（未出貨）</td><td>取消結案</td><td>→ 1 未結案（toggle 重開）</td></tr>
 <tr><td>3 結案（未出貨）</td><td>刪除銷貨單</td><td>不動（reopen 只管 2→1）</td></tr>
 </table></div>
-
 <blockquote><strong>這一輪證明了方法論可行：兩個模型反例都在真實程式重現、經業務裁定後修復、重建模型 re-verify 全綠、留下 regression 守門。下一個可套用的目標：傳票狀態機、庫存調撥雙方鎖定、或銷退單的數量守恆。</strong></blockquote>
 
 <footer>AI Software Factory 2.0 · ERP 實戰案例 · 對應實際 Laravel ERP 程式碼</footer>
