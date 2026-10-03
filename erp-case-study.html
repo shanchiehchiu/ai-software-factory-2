@@ -127,7 +127,7 @@
 
 <h2 id="s0">〇、三十秒讀完的故事</h2>
 <p>銷售訂單只有三個狀態：未結案、結案、還有一個叫「取消」。看起來簡單到不可能出錯。</p>
-<p>我們把「訂單可以怎麼跳狀態」寫成一份給機器看的規則書，然後讓電腦在模擬器裡<strong>亂玩一萬次</strong>——用盡各種人類想不到的操作順序去戳它。結果抓到兩個真 bug：</p>
+<p>我們把「訂單可以怎麼跳狀態」寫成一份給機器看的規則書，然後讓一個叫 <strong>Quint</strong> 的模型檢查器在模擬環境裡<strong>亂玩一萬次</strong>——用盡各種人類想不到的操作順序去戳它。結果抓到兩個真 bug：</p>
 <ol>
 <li><strong>幽靈按鈕</strong>：對已結案的訂單再按一次「結案」，程式會踩到一個從未設定的變數——工程師手寫測試永遠不會想到要按第二下。</li>
 <li><strong>後門寫入</strong>：刪掉出貨單時，程式不走正常流程，直接偷改訂單狀態——連「手動關掉的單」也會被它偷偷打開。</li>
@@ -148,48 +148,49 @@
 
 <h3>Step 0 — 選哪個目標下手</h3>
 <p>手冊的篩選表是這個：值得建模的目標有五種類型——<strong>狀態機</strong>（有明確狀態轉換規則）、<strong>Concurrency</strong>（多個交易會交錯搶資料）、<strong>Distributed Workflow</strong>（跨服務會重試亂序）、<strong>Authorization</strong>（誰能做什麼有規則）、<strong>Resource Invariant</strong>（有可算的守恆條件）。符合越多越值得做；CRUD 頁、報表排版這種「錯的定義寫不出來」的不適合。</p>
-<p>拿這張表對 ERP 掃過去，對應出三個缺口：<strong>狀態機</strong>（SalesOrder 的 1/2/3 轉換散在 Service/Controller）、<strong>Resource Invariant</strong>（借貸平衡、庫存守恆）、<strong>Concurrency</strong>（<code>close()</code> 是無鎖 read-then-write）。第一個建模對象選 SalesOrder——缺口最集中、 blast radius 最小。</p>
+<p>拿這張表對 ERP 掃過去，對應出三個缺口：<strong>狀態機</strong>（SalesOrder 的 1/2/3 轉換散在 Service/Controller）、<strong>Resource Invariant</strong>（借貸平衡、庫存守恆）、<strong>Concurrency</strong>（<code>close()</code> 是「先讀狀態、再寫回」兩步，沒有上鎖，兩人同時操作會互踩）。第一個建模對象選 SalesOrder——缺口最集中、改壞時波及範圍最小。</p>
 
 <h3>Step 1 — 寫下規矩（Frozen Requirement）</h3>
 <p>產出 <code>fv/sales-order/source.md</code>：狀態表（1=未結案／2=結案／3=結案-未出貨）、R1–R5 需求條文、Q1–Q5 語意裁定表。寫規格時撞上教科書沒提的坑——<strong>狀態名會說謊</strong>：值 3 標籤是「取消」，程式卻把它當「手動結案」用（<code>getCloseAttribute</code> 把 [2,3] 都算 closed）。先依「取消」裁定成終態，再從程式消費方式發現誤名，最後用 migration 正名為「結案（未出貨）」。規格跟著正名後的語意重寫。</p>
 
 <h3>Step 2 — 把規矩寫成檢查式（Invariant Registry）</h3>
-<p><code>sales-order.qnt</code> 的 <code>module invariants</code>：合法轉換集合 <code>{1→2, 1→3, 2→1, 3→1}</code>（每次裁定後回填）、<code>invOnlyLegalTransitions</code>、<code>invStatusInDomain</code>。金額守恆型的規矩沒有進 model——<code>VoucherBalanceInvariant</code> 用 PHP 單一裁判類更直接，放進 <code>SummonService</code> 寫入咽喉點，所有傳票寫入不可略過。</p>
+<p>規矩寫進模型檔 <code>sales-order.qnt</code>：一張「合法跳轉清單」<code>{1→2, 1→3, 2→1, 3→1}</code>（每次業務裁定後回填），加兩條檢查——「狀態只能沿清單跳」「狀態只能是 1/2/3」。至於「借貸要相等」這種金額守恆的規矩，沒有進模型——用 PHP 寫一個裁判類（<code>VoucherBalanceInvariant</code>）更直接，放在 <code>SummonService</code> 的寫入咽喉點，所有傳票寫入都繞不過它。</p>
 
 <h3>Step 3 — 蓋一個迷你版系統（As-Is Model）</h3>
-<p><code>module salesOrder</code> 照實際程式投影，不是理想版：<code>close()</code> 拆成 <code>t1Begin/t1Commit、t2Begin/t2Commit</code> 兩個交易，能交錯出 stale read；刪除銷貨單的 Controller 直寫也如實建模成繞道 action。Quint 不支援跨檔 import，invariants 與 model 以同檔雙 module 維持 authority/projection 分界。</p>
+<p>這裡用的工具是 <strong>Quint</strong>——一個模型檢查器（model checker）。你用它的語言把系統寫成一個「迷你版」，它就能在模擬環境裡把所有可能的操作順序排列組合著玩；一旦玩到犯規，會把整段過程一步步錄下來。</p>
+<p>迷你版照真實程式的壞習慣做，不美化：<code>close()</code> 在真實程式是「先讀狀態、再寫回」兩步，模型就拆成兩步，這樣 Quint 才玩得動「A 讀到狀態時 B 已經改掉了」的穿插狀況；Controller 偷改狀態的後門也如實做進去，當作一個繞道動作。（技術細節：Quint 不支援我們需要的跨檔引用，所以「規矩」和「迷你版」放同一檔的兩個模組裡。）</p>
 
 <h3>Step 4 — 讓機器亂玩一萬次（State Exploration）</h3>
 <p><code>quint run --max-samples=10000</code> 抓到兩個真反例：</p>
 <ul>
-<li><code>inv_onlyLegalTransitions</code> ❌ — 刪銷貨單對未結案單產生 1→1 同態寫入；結案單被繞道 2→1</li>
-<li><code>inv_closeDefined</code> ❌ — 對結案(2)執行 close 落入未定義分支</li>
+<li><strong>「只能沿合法清單跳」被打破</strong> ❌ — 刪銷貨單時訂單狀態被繞道直寫回 1；對未結案單還會產生無意義的 1→1 重複寫入</li>
+<li><strong>「每個狀態都要有定義」被打破</strong> ❌ — 對已結案（2）的訂單再按結案，程式踩進一個從沒定義過的分支（實際是用了沒設定的變數）</li>
 </ul>
-<p>反例 ITF trace 存證在 <code>fv/sales-order/counterexamples/</code>。</p>
+<p>兩段犯規過程的完整操作錄影（trace）存在 <code>fv/sales-order/counterexamples/</code> 存證。</p>
 
 <h3>Step 5 — 回真實程式重現（Counterexample → Replay）</h3>
-<p><code>SalesOrderStateMachineReplayTest</code> 把兩條 trace 在真實 <code>OrderService</code>/<code>SalesSoldOrderController::destroy()</code> 上重播，雙雙 RED = defect confirmed（不是模型誤報）。</p>
+<p><code>SalesOrderStateMachineReplayTest</code> 把兩段錄影拿到真實程式上重播（寫成 PHPUnit 測試，跑 <code>OrderService</code> 和 <code>SalesSoldOrderController::destroy()</code>），兩條都真的壞掉——確認不是模型想太多，是真 bug。</p>
 
 <h3>Step 6 — 修好、重建迷你版、再驗一次</h3>
 <ul>
-<li>業務裁定 Q1（結案單按結案=冪等）、Q2 經由「正名」解開（status 3 實為手動結案，3→1 是合法 toggle）</li>
+<li>業務裁定：結案單再按結案＝當沒按，直接回傳原狀（重按幾次都不變）；Q2 經由「正名」解開——status 3 實為手動結案，3→1 是合法的「取消結案」切換</li>
 <li><code>reopen()</code> 收進 Service、Controller 兩處直寫移除、<code>close()</code> 補 2/3 分支</li>
-<li>模型重投影（reopen 語意、2/3 冪等）、合法轉換集合同步裁定結果</li>
-<li>re-verify：<code>inv_onlyLegalTransitions</code>、<code>inv_statusInDomain</code> 全綠（10,000 traces）</li>
+<li>迷你版跟著真實程式改寫（reopen 的新規則、2/3 狀態重按不寫入），合法跳轉清單同步裁定結果</li>
+<li>重驗：一萬次亂玩，「合法跳轉」「狀態只能是 1/2/3」兩條檢查全綠</li>
 </ul>
 
 <h3>Step 7 — 確認檢查不是空轉（Witness / Mutation）</h3>
 <ul>
-<li>Witness：<code>closedReached</code> 72%、<code>reopened</code> 87%、<code>bypass</code> 97% —— 非空轉</li>
-<li>Mutation：往 <code>app/</code> 塞假繞道檔案，白名單測試正確抓紅並列出檔名</li>
-<li>反向紀律實例：Q1 修復後 <code>inv_closeDefined</code> 結構上不可能再觸發 → 連同 <code>undefinedClose</code> 一併刪除，不留 vacuous green</li>
+<li><strong>目擊檢查</strong>：光「沒抓到犯規」不夠——也許是根本沒走到那裡。所以反問機器「你有真的走到結案嗎？有真的走到重開嗎？」三條探針命中率 72%／87%／97%，證明檢查有在動，不是空轉</li>
+<li><strong>故意搞破壞</strong>：塞一個假的繞道檔案進 <code>app/</code>，看「只有 Service 能改狀態」的檢查會不會抓——會，還正確報出檔名</li>
+<li><strong>反過來也要刪</strong>：修好後有一條檢查已經「結構上不可能再犯規」，留著只會製造假綠燈——連同對應旗標一起刪掉</li>
 </ul>
 
 <h3>教科書沒寫的教訓</h3>
 <ul>
 <li><strong>狀態名會說謊</strong>：寫規格前先查「程式怎麼消費這個值」，別信資料表標籤。</li>
-<li><strong>修復是雙向更新</strong>：code 修好了，spec 的合法集合也要回填裁定結果（2→1 從「違規」變「合法」），不然 invariant 會誤殺新行為。</li>
-<li><strong>invariant 也會過期</strong>：不再可能觸發的檢查要刪，全綠的清單應該每條都有活的意義。</li>
+<li><strong>修復是雙向更新</strong>：code 修好了，規則書的合法清單也要回填裁定結果（2→1 從「違規」變「合法」），不然檢查會誤殺新行為。</li>
+<li><strong>檢查也會過期</strong>：不再可能觸發的檢查要刪，全綠的清單應該每條都有活的意義。</li>
 </ul>
 
 <h3>修正後的狀態機（全部已定義）</h3>
@@ -197,9 +198,9 @@
 <tr><th>目前狀態</th><th>動作</th><th>結果</th></tr>
 <tr><td>1 未結案</td><td>結案，無銷貨單</td><td>→ 3 結案（未出貨）</td></tr>
 <tr><td>1 未結案</td><td>結案，有銷貨單</td><td>→ 2 結案</td></tr>
-<tr><td>2 結案</td><td>再按結案</td><td>冪等，不寫入</td></tr>
+<tr><td>2 結案</td><td>再按結案</td><td>沒反應，不寫入（按幾次都一樣）</td></tr>
 <tr><td>2 結案</td><td>刪除銷貨單</td><td>→ 1 未結案（經 reopen()）</td></tr>
-<tr><td>3 結案（未出貨）</td><td>取消結案</td><td>→ 1 未結案（toggle 重開）</td></tr>
+<tr><td>3 結案（未出貨）</td><td>取消結案</td><td>→ 1 未結案（重開）</td></tr>
 <tr><td>3 結案（未出貨）</td><td>刪除銷貨單</td><td>不動（reopen 只管 2→1）</td></tr>
 </table></div>
 <blockquote><strong>這一輪證明了方法論可行：兩個模型反例都在真實程式重現、經業務裁定後修復、重建模型 re-verify 全綠、留下 regression 守門。下一個可套用的目標：傳票狀態機、庫存調撥雙方鎖定、或銷退單的數量守恆。</strong></blockquote>
@@ -258,7 +259,7 @@ INV_reopenOnlyViaDefinedPath
 <li>transaction 拆 begin/read/commit，才能跑出「兩人同時按結案」的交錯</li>
 </ul>
 
-<h2 id="s5">五、規劃稿・目標二：借貸平衡（最容易寫成 executable contract）</h2>
+<h2 id="s5">五、規劃稿・目標二：借貸平衡（最容易變成程式檢查的規矩）</h2>
 <p class="plain">白話（規劃稿）：「借貸要相等」散在三個檔案各寫一遍——收進一個裁判，誰都繞不過。</p>
 <h3>現況</h3>
 <p>「Σ借 = Σ貸」目前有三份實作，散在不同 Controller：</p>
@@ -272,7 +273,7 @@ VoucherTransferController :666
 <ol>
 <li>抽一個 <code>app/Service/Finance/VoucherBalanceInvariant.php</code>：輸入分錄陣列，輸出 pass/fail + 差額</li>
 <li>三處 Controller 檢查全部改呼叫它（消掉重複實作）</li>
-<li>寫 property test：對 <code>VoucherTransferService</code> 餵隨機合法單據組合，<strong>每次產生的傳票都必須過 invariant</strong></li>
+<li>寫隨機產生測試：對 <code>VoucherTransferService</code> 餵隨機合法單據組合，<strong>每次產生的傳票都必須過借貸檢查</strong></li>
 </ol>
 <pre>// tests/Unit/Finance/VoucherBalanceInvariantTest.php 概念稿
 public function test_generated_voucher_always_balanced(): void
@@ -280,7 +281,7 @@ public function test_generated_voucher_always_balanced(): void
     // 對各種單據型態（Payment / Receipt / RestockOrder ...）
     // 產生 voucher entries，斷言 Σdebit == Σlender
 }</pre>
-<p>這是最便宜的一刀：不用裝 Quint、不用建模，就把一條散落規則變成 executable contract。</p>
+<p>這是最便宜的一刀：不用裝 Quint、不用建模，就把一條散落規則變成程式能自己檢查的規矩。</p>
 
 <h2 id="s6">六、規劃稿・目標三：庫存寫入路徑（架構約束，不是測試）</h2>
 <p class="plain">白話（規劃稿）：庫存彙總表誰都能寫就會出事——立一條「只有它能寫」的 CI 規則。</p>
@@ -359,7 +360,7 @@ public function test_concurrent_close_does_not_produce_illegal_transition(): voi
 <p class="plain">白話（規劃稿）：原本排的六步施工順序——實際執行幾乎照單全收。</p>
 <div class="table-wrap"><table>
 <tr><th>順序</th><th>工作</th><th>產出物</th><th>對應層級</th></tr>
-<tr><td>1</td><td>抽 <code>VoucherBalanceInvariant</code>、消重、寫 property test</td><td>1 個 Service + 1 個測試檔</td><td>L3</td></tr>
+<tr><td>1</td><td>抽 <code>VoucherBalanceInvariant</code>、消重、寫隨機產生測試</td><td>1 個 Service + 1 個測試檔</td><td>L3</td></tr>
 <tr><td>2</td><td>寫「product_stocks 只能經白名單寫入」架構測試</td><td>1 個測試檔 + 白名單清單</td><td>L3</td></tr>
 <tr><td>3</td><td>SalesOrder：frozen requirement（先裁定第 3 節那 4 個問題）</td><td><code>fv/sales-order/source.md</code></td><td>Spec</td></tr>
 <tr><td>4</td><td>invariants.qnt + model.qnt + quint run</td><td>qnt 檔 + counterexample 存證</td><td>L3.5</td></tr>
