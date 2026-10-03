@@ -147,7 +147,8 @@
 <p>本節對照 <a href="implementation.html">實作手冊</a>的每個 Step，記錄在這個 ERP 實際發生的事。日期：2026-10。</p>
 
 <h3>Step 0 — 選哪個目標下手</h3>
-<p>篩選表對應出三個缺口：<strong>狀態機</strong>（SalesOrder 的 1/2/3 轉換散在 Service/Controller）、<strong>Resource Invariant</strong>（借貸平衡、庫存守恆）、<strong>Concurrency</strong>（<code>close()</code> 是無鎖 read-then-write）。第一個建模對象選 SalesOrder——缺口最集中、 blast radius 最小。</p>
+<p>手冊的篩選表是這個：值得建模的目標有五種類型——<strong>狀態機</strong>（有明確狀態轉換規則）、<strong>Concurrency</strong>（多個交易會交錯搶資料）、<strong>Distributed Workflow</strong>（跨服務會重試亂序）、<strong>Authorization</strong>（誰能做什麼有規則）、<strong>Resource Invariant</strong>（有可算的守恆條件）。符合越多越值得做；CRUD 頁、報表排版這種「錯的定義寫不出來」的不適合。</p>
+<p>拿這張表對 ERP 掃過去，對應出三個缺口：<strong>狀態機</strong>（SalesOrder 的 1/2/3 轉換散在 Service/Controller）、<strong>Resource Invariant</strong>（借貸平衡、庫存守恆）、<strong>Concurrency</strong>（<code>close()</code> 是無鎖 read-then-write）。第一個建模對象選 SalesOrder——缺口最集中、 blast radius 最小。</p>
 
 <h3>Step 1 — 寫下規矩（Frozen Requirement）</h3>
 <p>產出 <code>fv/sales-order/source.md</code>：狀態表（1=未結案／2=結案／3=結案-未出貨）、R1–R5 需求條文、Q1–Q5 語意裁定表。寫規格時撞上教科書沒提的坑——<strong>狀態名會說謊</strong>：值 3 標籤是「取消」，程式卻把它當「手動結案」用（<code>getCloseAttribute</code> 把 [2,3] 都算 closed）。先依「取消」裁定成終態，再從程式消費方式發現誤名，最後用 migration 正名為「結案（未出貨）」。規格跟著正名後的語意重寫。</p>
