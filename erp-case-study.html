@@ -29,6 +29,7 @@
   .backlink a { color: var(--accent); text-decoration: none; }
   .backlink a:hover { text-decoration: underline; }
   h2 { font-size: 1.45rem; line-height: 1.4; margin: 3rem 0 .8rem; padding-top: 1.2rem; border-top: 1px solid var(--line); scroll-margin-top: 1rem; }
+  p.plain { color: var(--muted); font-size: .88rem; margin: -.3rem 0 1rem; padding-left: .8rem; border-left: 3px solid var(--accent); }
   h3 { font-size: 1.15rem; margin: 2rem 0 .5rem; color: var(--accent); scroll-margin-top: 1rem; }
   p { margin: .8rem 0; }
   blockquote {
@@ -124,27 +125,40 @@
 <div class="toolbar"><button id="expand-all" type="button">全部展開</button><button id="collapse-all" type="button">全部收合</button></div>
 <details class="toc" id="toc" hidden><summary>目錄</summary><ol></ol></details>
 
+<h2 id="s0">〇、三十秒讀完的故事</h2>
+<p>銷售訂單只有三個狀態：未結案、結案、還有一個叫「取消」。看起來簡單到不可能出錯。</p>
+<p>我們把「訂單可以怎麼跳狀態」寫成一份給機器看的規則書，然後讓電腦在模擬器裡<strong>亂玩一萬次</strong>——用盡各種人類想不到的操作順序去戳它。結果抓到兩個真 bug：</p>
+<ol>
+<li><strong>幽靈按鈕</strong>：對已結案的訂單再按一次「結案」，程式會踩到一個從未設定的變數——工程師手寫測試永遠不會想到要按第二下。</li>
+<li><strong>後門寫入</strong>：刪掉出貨單時，程式不走正常流程，直接偷改訂單狀態——連「手動關掉的單」也會被它偷偷打開。</li>
+</ol>
+<p>然後是最戲劇化的發現：那個叫「取消」的狀態，<strong>根本不是取消</strong>——程式其實把它當「手動結案」在用，名字從一開始就寫錯了。差點因為信錯名字，把一個正常功能當 bug 砍掉。</p>
+<p>修完之後，我們留了自動檢查守在程式碼裡，以後誰想繞道改訂單狀態，CI 直接擋下。下面第二節是完整過程；第三節起是當初規劃時的原始盤點，對照看「計畫 vs 實際」。</p>
+<blockquote><strong>一句話：讓機器用一萬種亂七八糟的方式使用你的系統，它會找到你永遠想不到的 bug。</strong></blockquote>
+
 <h2 id="s1">一、這份文件是什麼</h2>
+<p class="plain">白話：這頁記錄了一次真實的「機器抓 bug」過程——後半部是動手前寫的計畫，對照看就知道哪些猜對了、哪些翻車。</p>
 <p>這是一場<strong>已經跑完</strong>的形式化驗證實戰紀錄：在一個真實的 Laravel ERP 上，照<a href="implementation.html">實作手冊</a>的 Step 0–7 走完選目標 → 寫規格 → 建模 → 探索 → Replay → 修復 → 防空轉的完整循環。</p>
 <blockquote><strong>主體是第二節的執行紀實；第三節起是執行前寫的原始盤點與規劃稿，留作背景——對照著看可以看到「計畫 vs 實際」哪裡一致、哪裡翻車。</strong></blockquote>
 <p>所有引用的檔案與行號都是該 ERP 裡的實際程式碼。</p>
 
 <h2 id="s2">二、執行結果紀實 — 照手冊 Step 0–7 跑完一輪</h2>
+<p class="plain">白話：方法論每個步驟實際發生的事——兩個真 bug、一次命名翻車、七次 commit。</p>
 <p>本節對照 <a href="implementation.html">實作手冊</a>的每個 Step，記錄在這個 ERP 實際發生的事。日期：2026-10。</p>
 
-<h3>Step 0 — 選目標</h3>
+<h3>Step 0 — 選哪個目標下手</h3>
 <p>篩選表對應出三個缺口：<strong>狀態機</strong>（SalesOrder 的 1/2/3 轉換散在 Service/Controller）、<strong>Resource Invariant</strong>（借貸平衡、庫存守恆）、<strong>Concurrency</strong>（<code>close()</code> 是無鎖 read-then-write）。第一個建模對象選 SalesOrder——缺口最集中、 blast radius 最小。</p>
 
-<h3>Step 1 — Frozen Requirement</h3>
+<h3>Step 1 — 寫下規矩（Frozen Requirement）</h3>
 <p>產出 <code>fv/sales-order/source.md</code>：狀態表（1=未結案／2=結案／3=結案-未出貨）、R1–R5 需求條文、Q1–Q5 語意裁定表。寫規格時撞上教科書沒提的坑——<strong>狀態名會說謊</strong>：值 3 標籤是「取消」，程式卻把它當「手動結案」用（<code>getCloseAttribute</code> 把 [2,3] 都算 closed）。先依「取消」裁定成終態，再從程式消費方式發現誤名，最後用 migration 正名為「結案（未出貨）」。規格跟著正名後的語意重寫。</p>
 
-<h3>Step 2 — Invariant Registry</h3>
+<h3>Step 2 — 把規矩寫成檢查式（Invariant Registry）</h3>
 <p><code>sales-order.qnt</code> 的 <code>module invariants</code>：合法轉換集合 <code>{1→2, 1→3, 2→1, 3→1}</code>（每次裁定後回填）、<code>invOnlyLegalTransitions</code>、<code>invStatusInDomain</code>。金額守恆型的規矩沒有進 model——<code>VoucherBalanceInvariant</code> 用 PHP 單一裁判類更直接，放進 <code>SummonService</code> 寫入咽喉點，所有傳票寫入不可略過。</p>
 
-<h3>Step 3 — As-Is Model</h3>
+<h3>Step 3 — 蓋一個迷你版系統（As-Is Model）</h3>
 <p><code>module salesOrder</code> 照實際程式投影，不是理想版：<code>close()</code> 拆成 <code>t1Begin/t1Commit、t2Begin/t2Commit</code> 兩個交易，能交錯出 stale read；刪除銷貨單的 Controller 直寫也如實建模成繞道 action。Quint 不支援跨檔 import，invariants 與 model 以同檔雙 module 維持 authority/projection 分界。</p>
 
-<h3>Step 4 — State Exploration</h3>
+<h3>Step 4 — 讓機器亂玩一萬次（State Exploration）</h3>
 <p><code>quint run --max-samples=10000</code> 抓到兩個真反例：</p>
 <ul>
 <li><code>inv_onlyLegalTransitions</code> ❌ — 刪銷貨單對未結案單產生 1→1 同態寫入；結案單被繞道 2→1</li>
@@ -152,10 +166,10 @@
 </ul>
 <p>反例 ITF trace 存證在 <code>fv/sales-order/counterexamples/</code>。</p>
 
-<h3>Step 5 — Counterexample → Replay</h3>
+<h3>Step 5 — 回真實程式重現（Counterexample → Replay）</h3>
 <p><code>SalesOrderStateMachineReplayTest</code> 把兩條 trace 在真實 <code>OrderService</code>/<code>SalesSoldOrderController::destroy()</code> 上重播，雙雙 RED = defect confirmed（不是模型誤報）。</p>
 
-<h3>Step 6 — 修復 → 重建 → Re-verify</h3>
+<h3>Step 6 — 修好、重建迷你版、再驗一次</h3>
 <ul>
 <li>業務裁定 Q1（結案單按結案=冪等）、Q2 經由「正名」解開（status 3 實為手動結案，3→1 是合法 toggle）</li>
 <li><code>reopen()</code> 收進 Service、Controller 兩處直寫移除、<code>close()</code> 補 2/3 分支</li>
@@ -163,7 +177,7 @@
 <li>re-verify：<code>inv_onlyLegalTransitions</code>、<code>inv_statusInDomain</code> 全綠（10,000 traces）</li>
 </ul>
 
-<h3>Step 7 — Witness / Mutation</h3>
+<h3>Step 7 — 確認檢查不是空轉（Witness / Mutation）</h3>
 <ul>
 <li>Witness：<code>closedReached</code> 72%、<code>reopened</code> 87%、<code>bypass</code> 97% —— 非空轉</li>
 <li>Mutation：往 <code>app/</code> 塞假繞道檔案，白名單測試正確抓紅並列出檔名</li>
@@ -190,6 +204,7 @@
 <blockquote><strong>這一輪證明了方法論可行：兩個模型反例都在真實程式重現、經業務裁定後修復、重建模型 re-verify 全綠、留下 regression 守門。下一個可套用的目標：傳票狀態機、庫存調撥雙方鎖定、或銷退單的數量守恆。</strong></blockquote>
 
 <h2 id="s3">三、規劃稿・現況盤點：三個可以立刻下手的缺口</h2>
+<p class="plain">白話（規劃稿）：動手前掃描整個 codebase，找出最值得驗證的三個地方。</p>
 <div class="table-wrap"><table>
 <tr><th>缺口</th><th>位置</th><th>現況</th></tr>
 <tr><td>單據狀態機沒有規格</td><td><code>app/Service/Sales/OrderService.php:325</code> 等 20+ 處 <code>close()</code></td><td>狀態是 <code>statuses_id</code> 魔法數字，轉換規則散在各 Service，部分轉換根本沒定義</td></tr>
@@ -198,6 +213,7 @@
 </table></div>
 
 <h2 id="s4">四、規劃稿・目標一：銷售訂單狀態機（第一個建模對象）</h2>
+<p class="plain">白話（規劃稿）：為什麼第一個選訂單——當時從程式碼硬讀出的狀態轉換表，後來證明讀對了。</p>
 <h3>為什麼先選它</h3>
 <p>狀態少（只有 3 個）、轉換已經出 bug、且「刪除銷貨單會回寫訂單狀態」這種繞道轉換正是 model checker 擅長抓的東西。</p>
 <h3>從程式碼讀出的 As-Is 轉換表</h3>
@@ -242,6 +258,7 @@ INV_reopenOnlyViaDefinedPath
 </ul>
 
 <h2 id="s5">五、規劃稿・目標二：借貸平衡（最容易寫成 executable contract）</h2>
+<p class="plain">白話（規劃稿）：「借貸要相等」散在三個檔案各寫一遍——收進一個裁判，誰都繞不過。</p>
 <h3>現況</h3>
 <p>「Σ借 = Σ貸」目前有三份實作，散在不同 Controller：</p>
 <pre>SummonController :298, :530
@@ -265,6 +282,7 @@ public function test_generated_voucher_always_balanced(): void
 <p>這是最便宜的一刀：不用裝 Quint、不用建模，就把一條散落規則變成 executable contract。</p>
 
 <h2 id="s6">六、規劃稿・目標三：庫存寫入路徑（架構約束，不是測試）</h2>
+<p class="plain">白話（規劃稿）：庫存彙總表誰都能寫就會出事——立一條「只有它能寫」的 CI 規則。</p>
 <p><code>StockQuantityService::adjust()</code> 本身是教科書級的原子異動：<code>lockForUpdate</code> + DB 端 <code>stock + delta</code> 運算式 + 唯一索引重試。問題不在它，在於 <code>product_stocks</code> 表還有這些繞道寫入者：</p>
 <pre>app/Http/Controllers/Backend/SalesSoldOrderController.php
 app/Http/Controllers/Backend/PdaTransferController.php
@@ -291,6 +309,7 @@ INV_stockConservation（稽核回放）
 <p>注意：有些列出的檔案可能只是「讀」product_stocks，落地前先逐一確認是讀是寫——白名單判斷本身就是一次架構盤點。</p>
 
 <h2 id="s7">七、規劃稿・Quint 怎麼裝、放哪、跑什麼</h2>
+<p class="plain">白話（規劃稿）：工具安裝與指令速查——照抄就能跑。</p>
 <h3>安裝</h3>
 <pre>npm install -g @informalsystems/quint</pre>
 <h3>建議的檔案位置（開在 ERP repo 內）</h3>
@@ -319,6 +338,7 @@ quint verify fv/sales-order/model.qnt --invariant=...</pre>
 <p>產出的 counterexample trace 就是 bug reproduction recipe，拿去寫 PHPUnit replay 測試。</p>
 
 <h2 id="s8">八、規劃稿・Counterexample → Replay 在這個專案長什麼樣</h2>
+<p class="plain">白話（規劃稿）：機器說「這裡會壞」之後，怎麼用真實測試證明它沒說錯。</p>
 <p>假設 Quint 對「兩個併發 close()」吐出反例：</p>
 <pre>State 0: order.status = 1
 TxnA: read status=1, sold_order exists → 打算寫 2
@@ -335,6 +355,7 @@ public function test_concurrent_close_does_not_produce_illegal_transition(): voi
 <p>規則：model 抓到的叫「候選 defect」，replay 在真實 Laravel 跑出 RED 才算確認；replay 不出來就回頭修 model——model 是投影，會失真。</p>
 
 <h2 id="s9">九、規劃稿・落地順序與產出物</h2>
+<p class="plain">白話（規劃稿）：原本排的六步施工順序——實際執行幾乎照單全收。</p>
 <div class="table-wrap"><table>
 <tr><th>順序</th><th>工作</th><th>產出物</th><th>對應層級</th></tr>
 <tr><td>1</td><td>抽 <code>VoucherBalanceInvariant</code>、消重、寫 property test</td><td>1 個 Service + 1 個測試檔</td><td>L3</td></tr>
@@ -347,6 +368,7 @@ public function test_concurrent_close_does_not_produce_illegal_transition(): voi
 <p>前兩項不碰 Quint，純 PHP 就能做，先建立「規則可以被機器執行」的肌肉；第 3 項開始才進 formal pipeline。</p>
 
 <h2 id="s10">十、規劃稿・要事先講清楚的界線</h2>
+<p class="plain">白話（規劃稿）：這套方法不是萬靈丹——它能保證什麼、不能保證什麼，先講清楚。</p>
 <ul>
 <li><strong>PHP 沒有 proof checker</strong>：這裡做的是「Executable Spec + Sampled State Exploration」，對應主文的 L3~L4，不是 L5 數學證明</li>
 <li><strong>quint run 是 sampling</strong>：找 bug 很強，但「沒找到」≠ 證明正確；要更強才上 <code>quint verify</code></li>
